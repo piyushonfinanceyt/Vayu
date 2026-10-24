@@ -1,0 +1,68 @@
+/* Reset, typography, focus, motion. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 96px; overflow-x: clip; }
+body { overflow-x: clip; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 14px/1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color .3s var(--ease), color .3s var(--ease);
+}
+h1, h2, h3, h4, p { margin: 0; }
+h1 { font-size: clamp(28px, 3.4vw, 38px); font-weight: 500; letter-spacing: -.025em; line-height: 1.1; }
+h2 { font-size: 15px; font-weight: 500; letter-spacing: -.01em; }
+h3 { font-size: 13px; font-weight: 500; }
+a { color: inherit; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+button:disabled, [aria-disabled="true"] { cursor: default; }
+img, svg { display: block; max-width: 100%; }
+svg.ic { width: 18px; height: 18px; flex: none; display: inline-block; vertical-align: middle; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+table { border-collapse: collapse; width: 100%; }
+[hidden] { display: none !important; }
+
+/* numbers: proportional on big standalone figures, tabular where columns align */
+.num, table td, table th, .axis, .tick { font-variant-numeric: tabular-nums; }
+
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 8px; }
+.hero :focus-visible, .dock :focus-visible { outline-color: var(--on-hero); }
+
+.sr-only { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: fixed; left: 12px; top: -60px; z-index: 100; background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: var(--r-pill); text-decoration: none; transition: top .2s; }
+.skip:focus { top: 12px; }
+
+.muted { color: var(--ink-3); }
+.small { font-size: 12px; }
+.grow { flex: 1 1 auto; min-width: 0; }
+.row { display: flex; align-items: center; gap: 10px; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.wrap { flex-wrap: wrap; }
+.stack > * + * { margin-top: 12px; }
+.lbl { font-size: 12px; color: var(--ink-3); }
+
+/* motion: enter animations run once per page visit (class .anim on the page) */
+@keyframes fade-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes grow-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes draw { from { stroke-dashoffset: var(--len, 1000); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.anim .card, .anim .tile { animation: fade-up .5s var(--ease) both; }
+.anim .card:nth-child(2), .anim .tile:nth-child(2) { animation-delay: .04s; }
+.anim .card:nth-child(3), .anim .tile:nth-child(3) { animation-delay: .08s; }
+.anim .card:nth-child(4), .anim .tile:nth-child(4) { animation-delay: .12s; }
+.anim .card:nth-child(n+5) { animation-delay: .16s; }
+
+::view-transition-old(main-view) { animation: .18s ease both fade-out-quick; }
+::view-transition-new(main-view) { animation: .32s var(--ease) both fade-up; }
+@keyframes fade-out-quick { to { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+  ::view-transition-old(main-view), ::view-transition-new(main-view) { animation: none; }
+}

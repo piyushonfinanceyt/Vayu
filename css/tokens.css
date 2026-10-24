@@ -1,0 +1,93 @@
+/* Design tokens: the Corbel editorial palette. Light is the default; dark is a designed set of its own
+   (not an inversion): the hero card flips to warm off-white so every row keeps one contrasting card.
+   JS resolves the theme into data-theme="light" | "dark" before first paint; the media query covers no-JS. */
+:root {
+  color-scheme: light;
+  --font: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --bg: #edece6;            /* warm off-white page */
+  --surface: #ffffff;       /* cards */
+  --soft: #e5e4dd;          /* the grey card / kanban column tone */
+  --soft-2: #f5f4f0;        /* fields, tracks, hover wash inside white cards */
+  --ink: #111110;
+  --ink-2: #4a4944;         /* secondary text */
+  --ink-3: #6b6962;         /* muted labels (4.6:1 on --bg, 5.4:1 on white) */
+  --ink-4: #9a988f;         /* decorative only: ticks, placeholders */
+  --line: #e1dfd8;          /* hairline */
+  --line-2: #cfcdc4;        /* stronger hairline, inactive marks */
+  --hatch: #c9c7be;
+  --track: #ebe9e3;
+
+  --brand: #14393a;         /* Vayu: deep sea-teal, used only for the mark and the app icon */
+  --on-brand: #eef1ec;
+  --hero: #121211;          /* the one near-black card per row */
+  --on-hero: #f4f3ee;
+  --on-hero-2: #a9a79f;
+  --hero-track: #34332f;
+
+  --good: #12783f;  --good-bg: #e1f1e6;  --good-mark: #1f9d55;
+  --warn: #8f5600;  --warn-bg: #fbecd0;  --warn-mark: #e8a020;
+  --bad: #b8302e;   --bad-bg: #fae3e1;   --bad-mark: #d9443f;
+  --info: #2a5fae;  --info-bg: #e3ecf9;
+
+  /* the six papers: identity dots and small-multiple lines only (validated categorical order, slots 1-6) */
+  --p1: #2a78d6; --p2: #eb6834; --p3: #1baf7a; --p4: #eda100; --p5: #e87ba4; --p6: #008300;
+  --area-1: #2a78d6; --area-2: #1baf7a; --area-3: #6250d6; --area-4: #eb6834; --area-5: #eda100; --area-6: #e87ba4; --area-7: #008300;
+
+  --r-card: 24px;
+  --r-md: 16px;
+  --r-sm: 12px;
+  --r-pill: 999px;
+  --shadow: 0 1px 2px rgba(17, 17, 16, .04), 0 14px 34px -20px rgba(17, 17, 16, .22);
+  --shadow-pop: 0 2px 6px rgba(17, 17, 16, .08), 0 22px 48px -18px rgba(17, 17, 16, .32);
+  --ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink);
+
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur: .45s;
+  --gutter: 16px;
+  --dock-w: 0px;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0c0c0b;
+  --surface: #171716;
+  --soft: #20201e;
+  --soft-2: #1f1f1d;
+  --ink: #f1f0eb;
+  --ink-2: #c4c2b9;
+  --ink-3: #9b998f;
+  --ink-4: #6a6862;
+  --line: #2a2a27;
+  --line-2: #3a3935;
+  --hatch: #44433e;
+  --track: #2a2a27;
+  --brand: #1f5052;
+  --on-brand: #eef1ec;
+  --hero: #f1f0eb;
+  --on-hero: #121211;
+  --on-hero-2: #5f5d57;
+  --hero-track: #d3d1c8;
+  --good: #5fd391;  --good-bg: #102a1b;  --good-mark: #3fbf73;
+  --warn: #f2b955;  --warn-bg: #2f2410;  --warn-mark: #e3a136;
+  --bad: #ff8a80;   --bad-bg: #351715;   --bad-mark: #f0625a;
+  --info: #8db8f5;  --info-bg: #14243b;
+  --p1: #3987e5; --p2: #d95926; --p3: #199e70; --p4: #c98500; --p5: #d55181; --p6: #2f9d2f;
+  --area-1: #3987e5; --area-2: #199e70; --area-3: #9085e9; --area-4: #d95926; --area-5: #c98500; --area-6: #d55181; --area-7: #2f9d2f;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 14px 34px -20px rgba(0, 0, 0, .8);
+  --shadow-pop: 0 2px 6px rgba(0, 0, 0, .5), 0 22px 48px -18px rgba(0, 0, 0, .9);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --bg: #0c0c0b; --surface: #171716; --soft: #20201e; --soft-2: #1f1f1d;
+    --ink: #f1f0eb; --ink-2: #c4c2b9; --ink-3: #9b998f; --ink-4: #6a6862;
+    --line: #2a2a27; --line-2: #3a3935; --hatch: #44433e; --track: #2a2a27;
+    --brand: #1f5052; --on-brand: #eef1ec;
+    --hero: #f1f0eb; --on-hero: #121211; --on-hero-2: #5f5d57; --hero-track: #d3d1c8;
+    --good: #5fd391; --good-bg: #102a1b; --good-mark: #3fbf73;
+    --warn: #f2b955; --warn-bg: #2f2410; --warn-mark: #e3a136;
+    --bad: #ff8a80; --bad-bg: #351715; --bad-mark: #f0625a;
+    --info: #8db8f5; --info-bg: #14243b;
+  }
+}

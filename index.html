@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en-IN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#edece6">
+<meta name="description" content="Vayu: CA Inter January 2027 study tracker. Plan, daily log, mocks, revision, 5K and the Winter Arc in one dashboard.">
+<title>Vayu</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Vayu">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%2314393a'/%3E%3Cpath d='M6 8l7.47 16L20.93 8' fill='none' stroke='%23eef1ec' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='26.27' cy='6.53' r='2.4' fill='%23eef1ec'/%3E%3C/svg%3E">
+<script>
+  // apply the saved theme before first paint ('system' follows the device)
+  (function () {
+    var t = 'system';
+    try { t = (JSON.parse(localStorage.getItem('fc.prefs') || '{}') || {}).theme || 'system'; } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/shell.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/charts.css">
+<link rel="stylesheet" href="css/views.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="app">
+  <header class="topbar" id="topbar">
+    <a class="brand pill" href="#/dashboard" aria-label="Vayu, go to the dashboard"><span class="brand-mark" id="brand-mark"></span><b aria-hidden="true">VAYU</b></a>
+    <nav class="tabs pill" id="tabs" aria-label="Main sections"></nav>
+    <div class="top-right">
+      <a class="live pill" id="live" href="#/study-plan"></a>
+      <button type="button" class="circle-btn pill only-narrow" data-act="palette" aria-label="Search and commands"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.5-4.5"/></svg></button>
+      <button type="button" class="circle-btn pill" id="bell" data-act="notifications" aria-haspopup="menu" aria-expanded="false" aria-label="Notifications"></button>
+      <button type="button" class="circle-btn pill avatar" id="avatar" data-act="profile" aria-haspopup="menu" aria-expanded="false" aria-label="Profile and settings">P</button>
+    </div>
+  </header>
+  <div id="banner"></div>
+  <main id="main" tabindex="-1" style="view-transition-name: main-view"><p class="muted" style="padding:40px 0">Opening your dashboard…</p></main>
+</div>
+<aside class="dock" id="dock" aria-label="Quick tools"></aside>
+<nav class="bottombar" id="bottombar" aria-label="Quick navigation"></nav>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<noscript><p style="padding:24px;font-family:system-ui">Vayu needs JavaScript. Enable it and reload.</p></noscript>
+
+<script src="data/seed.js"></script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
