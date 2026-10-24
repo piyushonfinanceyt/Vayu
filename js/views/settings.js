@@ -4,9 +4,10 @@
    Every field writes a settings override; clear a box to go back to your plan's value. */
 import { html, raw, esc, fmtDS, fmtDY, plural, clamp, isDate, fmtClock, timeToMin } from '../util.js';
 import * as pwa from '../pwa.js';
+import * as sync from '../sync.js';
 import { go } from '../router.js';
 import { icon } from '../icons.js';
-import { card, chip, seg, toast, confirm, form } from '../components.js';
+import { card, chip, status, seg, toast, confirm, form } from '../components.js';
 import { themePref, setTheme } from '../prefs.js';
 import { renderSoon } from '../router.js';
 import * as store from '../store.js';
@@ -49,6 +50,26 @@ function reminderCard() {
   });
 }
 
+function syncCard() {
+  const on = sync.connected(), S = sync.state, offline = S.kind === 'offline', ask = !on || sync.needsYou();
+  const inputs = html`<div class="fields sync-fields">
+      <label class="field"><span>GitHub token</span><input id="sync-token" class="in" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="${on ? 'Blank keeps the current token' : 'ghp_…'}"></label>
+      <label class="field"><span>Sync passphrase</span><input id="sync-pass" class="in" type="password" autocomplete="new-password" placeholder="The same on every device"></label></div>
+    <div class="row wrap" style="margin-top:12px"><button type="button" class="btn primary" data-act="sync-connect"${raw(S.busy ? ' disabled' : '')}>${icon('sync')}${on ? 'Reconnect' : 'Connect and sync'}</button></div>`;
+  const steps = html`<ol class="sync-steps">
+      <li><span><a href="${sync.TOKEN_URL}" target="_blank" rel="noopener">Create a GitHub token ${icon('external')}</a> with only the <b>gist</b> box ticked. Pick an expiry after your exam, such as 31 Jan 2027. Make one on each device, or reuse one.</span></li>
+      <li><span>Paste it below and choose a sync passphrase. Use the <b>same passphrase on every device</b>.</span></li>
+      <li><span>Connect. The first device uploads its data; each next one merges with it.</span></li></ol>`;
+  const head = !on ? '' : html`<ul class="list" style="margin-bottom:12px"><li>${icon(S.busy ? 'sync' : offline ? 'cloudOff' : S.error ? 'alert' : 'checkCircle')}<span class="li-main"><b>${S.busy ? 'Syncing…' : offline ? 'Offline · syncs when you’re back' : S.error ? 'Sync needs attention' : 'Synced ' + sync.ago(S.lastAt)}</b><small>${S.error || 'GitHub account @' + sync.account() + ' · encrypted · changes sync within seconds'}</small></span></li></ul>`;
+  return card({
+    title: 'Sync between devices', icon: 'sync', sub: 'Through an encrypted file in your GitHub account, so you can log on the phone and the computer',
+    actions: !on ? chip('Off') : S.busy ? chip('Syncing…') : S.error && !offline ? status('Needs attention', 'warn') : chip('On', 'ink'),
+    body: html`${head}${!on ? steps : ''}${ask ? inputs : ''}
+      ${on ? html`<div class="row wrap" style="margin-top:${ask ? '10px' : '0'}"><button type="button" class="btn" data-act="sync-now"${raw(S.busy ? ' disabled' : '')}>${icon('sync')}Sync now</button><button type="button" class="btn ghost" data-act="sync-off">Turn sync off on this device</button></div>` : ''}
+      <p class="hint">Each device keeps its full copy and works offline. Sync keeps the newest edit of each entry, per field for your daily log, and deletions carry over. Your data is encrypted with the passphrase before it leaves this device. The token and a key made from the passphrase stay on this device and never go into backups.</p>`
+  });
+}
+
 export default {
   head() { return { title: 'Settings', sub: raw(esc('Saved on this device as you change them · clear a box to go back to your plan’s value')) }; },
   render(M) {
@@ -72,7 +93,7 @@ export default {
     const data = card({ cls: 'span-5', title: 'Your data', icon: 'database', body: html`<p class="muted small">Stored in ${kind === 'indexeddb' ? 'IndexedDB' : kind === 'localstorage' ? 'browser storage' : 'memory only'} on this device. ${meta.migratedFrom || ''}. Set up on ${String(meta.initializedAt || '').slice(0, 10)}.</p>
       <div class="row wrap" style="margin-top:12px"><a class="btn sm" href="#/tools">${icon('database')}Backup and restore</a></div>
       <div class="danger-zone"><b>Reset all data</b><p class="small muted">Every log, goal, note, journal entry and setting on this device goes back to the original plan. A restore point is kept so you can undo it from Tools.</p><button type="button" class="btn danger" data-act="reset-all">${icon('trash')}Reset all data</button></div>` });
-    return html`<div class="grid">${profile}${examCard}</div>${reminderCard()}${plan}<div class="grid">${xpCard}${timerCard}</div><div class="grid">${areas}${data}</div>`;
+    return html`<div class="grid">${profile}${examCard}</div>${syncCard()}${reminderCard()}${plan}<div class="grid">${xpCard}${timerCard}</div><div class="grid">${areas}${data}</div>`;
   },
   segs: { theme: (v) => setTheme(v) },
   changes: {
@@ -98,8 +119,27 @@ export default {
     'area-add': () => openArea(null),
     'area-edit': (el) => openArea(el.dataset.id),
     'reset-all': async () => {
-      if (!(await confirm({ title: 'Erase all progress?', body: 'Every log, goal, task, note, journal entry and setting on this device goes back to the original plan. A restore point is saved first so you can undo this from Tools.', ok: 'Erase everything', danger: true }))) return;
+      if (!(await confirm({ title: 'Erase all progress?', body: 'Every log, goal, task, note, journal entry and setting on this device goes back to the original plan.' + (sync.connected() ? ' Sync is on, so your other devices are reset too.' : '') + ' A restore point is saved first so you can undo this from Tools.', ok: 'Erase everything', danger: true }))) return;
       await store.resetAll(); toast('All data reset · restore point saved');
+    },
+    'sync-connect': async () => {
+      const token = (document.getElementById('sync-token') || {}).value || '', pass = (document.getElementById('sync-pass') || {}).value || '';
+      const done = (r) => toast(r && r.pulled ? 'Sync on · ' + plural(r.pulled, 'update') + ' merged from your other device' : 'Sync on · this device’s data is saved to GitHub', { icon: 'sync', ms: 4000 });
+      try { done(await sync.connect(token, pass)); }
+      catch (e) {
+        if (e.kind !== 'pass' || sync.connected()) { toast(e.message, { tone: e.kind === 'offline' || e.kind === 'input' ? 'warn' : 'bad', ms: 6000 }); return; }
+        const replace = await confirm({ title: 'That passphrase doesn’t match', body: 'Your GitHub account already has synced Vayu data, locked with a different passphrase. Use the passphrase you chose on your other device. If you’ve forgotten it, you can replace the synced copy with this device’s data; your other devices will then ask for the new passphrase and merge their data into it.', ok: 'Replace the synced copy', danger: true });
+        if (!replace) return;
+        try { done(await sync.connect(token, pass, true)); } catch (e2) { toast(e2.message, { tone: 'bad', ms: 6000 }); }
+      }
+    },
+    'sync-now': async () => {
+      try { const r = await sync.syncNow('manual'); toast(r && r.pulled ? 'Synced · ' + plural(r.pulled, 'update') + ' from your other device' : 'Up to date', { icon: 'sync', ms: 2000 }); }
+      catch (e) { toast(e.message, { tone: e.kind === 'offline' ? 'warn' : 'bad', ms: 6000 }); }
+    },
+    'sync-off': async () => {
+      if (!(await confirm({ title: 'Turn sync off on this device?', body: 'Your data stays on this device, and the synced copy stays in your GitHub account. Turn it on again any time with a token and your passphrase.', ok: 'Turn sync off' }))) return;
+      sync.disconnect(); toast('Sync off on this device');
     }
   }
 };

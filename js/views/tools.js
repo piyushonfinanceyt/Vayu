@@ -3,9 +3,10 @@
    storage status, and the keyboard shortcuts. */
 import { html, raw, esc, fmt1, fmtD, fmtDY, plural, sortBy, sum, csv, download, todayStr, addDays, typeName, mmss, isObj, fmtMins } from '../util.js';
 import { icon } from '../icons.js';
-import { card, chip, status, empty, toast, confirm } from '../components.js';
+import { card, chip, status, empty, toast, confirm, modal } from '../components.js';
 import { renderSoon } from '../router.js';
 import * as store from '../store.js';
+import * as sync from '../sync.js';
 import * as db from '../db.js';
 import * as timer from '../timer.js';
 import * as pwa from '../pwa.js';
@@ -33,11 +34,24 @@ export async function importText(txt, label) {
   const err = store.validateBackup(o);
   if (err) { toast(err + ' Download one from Tools first.', { tone: 'bad', ms: 5000 }); return false; }
   const full = (o.version || 1) >= 2, d = o.data, cnt = (k, one, many) => plural(isObj(d[k]) ? Object.keys(d[k]).length : 0, one, many);
-  const summary = full ? 'Full restore: ' + [cnt('days', 'day log'), cnt('chapters', 'chapter'), cnt('mocks', 'mock'), cnt('runs', 'run'), cnt('goals', 'goal'), cnt('journal', 'journal entry', 'journal entries')].join(', ') + '. This replaces everything on this device.'
-    : 'Original tracker backup: ' + [cnt('days', 'day log'), cnt('chapters', 'chapter'), cnt('mocks', 'mock'), cnt('runs', 'run')].join(', ') + ' and settings. Your goals, notes, journal and other data stay as they are.';
+  const summary = full ? 'It holds ' + [cnt('days', 'day log'), cnt('chapters', 'chapter'), cnt('mocks', 'mock'), cnt('runs', 'run'), cnt('goals', 'goal'), cnt('journal', 'journal entry', 'journal entries')].join(', ') + '.'
+    : 'Original tracker backup: ' + [cnt('days', 'day log'), cnt('chapters', 'chapter'), cnt('mocks', 'mock'), cnt('runs', 'run')].join(', ') + ' and settings. Replacing keeps your goals, notes, journal and other data.';
   const when = o.exportedAt && !isNaN(Date.parse(o.exportedAt)) ? ' from ' + fmtDY(new Date(o.exportedAt).toISOString().slice(0, 10)) : '';
-  if (!(await confirm({ title: 'Import this backup' + when + '?', body: summary + ' A restore point is saved first, so you can undo this.', ok: 'Import' }))) return false;
-  try { await store.importBackup(o, label); toast('Backup imported'); return true; } catch (e) { toast('Import failed: ' + e.message, { tone: 'bad' }); return false; }
+  const pick = await choose({ title: 'Import this backup' + when + '?', body: summary + ' Merge it in keeps everything here and takes whatever is newer in the file, entry by entry. Replace everything makes this device match the file exactly' + (sync.connected() ? ', and your synced devices too' : '') + '. A restore point is saved first either way.' });
+  if (!pick) return false;
+  try {
+    if (pick === 'merge') { const n = await store.mergeBackup(o, label); toast(n ? 'Merged · ' + plural(n, 'entry', 'entries') + ' added or updated' : 'Nothing newer in that backup', { ms: 3000 }); }
+    else { await store.importBackup(o, label); toast('Backup imported · everything replaced'); }
+    return true;
+  } catch (e) { toast('Import failed: ' + e.message, { tone: 'bad' }); return false; }
+}
+// three-way choice: merge (the default), replace, or cancel
+function choose(o) {
+  return new Promise((res) => {
+    let answered = false;
+    const m = modal({ title: o.title, body: raw('<p class="muted">' + esc(o.body) + '</p>'), foot: raw('<button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn" data-pick="replace">Replace everything</button><button type="button" class="btn primary" data-pick="merge" autofocus>Merge it in</button>'), onClose: () => { if (!answered) res(null); } });
+    m.el.querySelectorAll('[data-pick]').forEach((b) => b.addEventListener('click', () => { answered = true; m.close(); res(b.dataset.pick); }));
+  });
 }
 
 function installCard() {
@@ -65,7 +79,7 @@ export default {
     const kind = db.kind();
     const backup = card({
       cls: 'span-7', title: 'Backup and restore', icon: 'database', sub: 'Download a backup each week and before switching phones or browsers',
-      body: html`<p class="muted small" style="margin-bottom:12px">Stored in ${kind === 'indexeddb' ? 'IndexedDB' : kind === 'localstorage' ? 'browser storage' : 'memory only, so nothing is saved'} on this device. Backups from the original GOD’S PLAN app import here too.</p>
+      body: html`<p class="muted small" style="margin-bottom:12px">Stored in ${kind === 'indexeddb' ? 'IndexedDB' : kind === 'localstorage' ? 'browser storage' : 'memory only, so nothing is saved'} on this device. Backups from the original GOD’S PLAN app import here too. Importing asks whether to merge the file in or replace everything. ${sync.connected() ? 'Sync is on, so your devices already share their data.' : raw('To log on more than one device, turn on <a href="#/settings">sync</a>.')}</p>
         <div class="row wrap"><button type="button" class="btn primary" data-act="export-json">${icon('download')}Download backup</button><button type="button" class="btn" data-act="export-copy">${icon('copy')}Copy backup</button><label class="btn">${icon('upload')}Import a backup file<input type="file" accept=".json,application/json" class="sr-only" data-change="import-file"></label></div>
         <label class="field" style="margin-top:14px"><span>Or paste a backup</span><textarea id="bk-paste" class="in" rows="3" placeholder="Paste the backup text here, then press Import"></textarea></label>
         <div class="row wrap" style="margin-top:8px"><button type="button" class="btn" data-act="import-paste">${icon('upload')}Import pasted backup</button></div>
@@ -106,7 +120,7 @@ export default {
     'import-paste': () => importText((document.getElementById('bk-paste') || {}).value, 'pasted backup'),
     'export-csv': () => { const k = (document.getElementById('csv-kind') || {}).value || 'daily', def = CSV[k]; if (!def) return; download('vayu-' + k + '-' + todayStr() + '.csv', '﻿' + def[1](modelOf()), 'text/csv'); toast(def[0] + ' CSV downloaded'); },
     'snapshot-now': async () => { await store.saveSnapshot('manual-' + Date.now(), 'Created by you'); toast('Restore point created'); renderSoon(); },
-    'snapshot-restore': async (el) => { if (!(await confirm({ title: 'Restore this point?', body: 'Your current data is saved as another restore point first.', ok: 'Restore' }))) return; try { await store.restoreSnapshot(el.dataset.key); toast('Restored'); } catch (e) { toast('Restore failed: ' + e.message, { tone: 'bad' }); } },
+    'snapshot-restore': async (el) => { if (!(await confirm({ title: 'Restore this point?', body: 'Your current data is saved as another restore point first.' + (sync.connected() ? ' Sync is on, so your other devices go back to this point too.' : ''), ok: 'Restore' }))) return; try { await store.restoreSnapshot(el.dataset.key); toast('Restored'); } catch (e) { toast('Restore failed: ' + e.message, { tone: 'bad' }); } },
     persist: async () => { const r = await db.persist(true); toast(r ? 'This browser will keep your data' : 'The browser didn’t allow it. Keep regular backups.', { tone: r ? 'good' : 'warn' }); renderSoon(); }
   }
 };

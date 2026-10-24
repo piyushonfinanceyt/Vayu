@@ -13,6 +13,7 @@ import { openPalette, isOpen as paletteOpen } from './palette.js';
 import { open as openQuickLog } from './quicklog.js';
 import * as timer from './timer.js';
 import * as pwa from './pwa.js';
+import * as sync from './sync.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
@@ -164,6 +165,9 @@ async function boot() {
   // installable offline app + the 10 PM reminder
   pwa.registerSW((hash) => go(hash));
   pwa.onChange(() => renderSoon());
+  // sync between devices (Settings → Sync between devices); does nothing until you connect it
+  sync.onChange(() => renderSoon());
+  sync.start();
   const remind = () => pwa.checkReminder(() => openQuickLog()).catch((e) => console.warn('[reminder]', e));
   let day = todayStr();
   setInterval(() => { if (todayStr() !== day) { day = todayStr(); render('update'); } remind(); }, 30000);

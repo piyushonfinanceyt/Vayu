@@ -5,6 +5,7 @@ import { icon } from './icons.js';
 import { menu, modal } from './components.js';
 import { resolvedTheme } from './prefs.js';
 import * as store from './store.js';
+import * as sync from './sync.js';
 
 export const ROUTES = [
   { id: 'dashboard', title: 'Dashboard', icon: 'dashboard', group: 1 },
@@ -140,6 +141,7 @@ export function notifications(anchor, M) {
   const items = M.notifications.map((x) => ({ label: x.title, hint: x.body, icon: x.icon, href: x.href }));
   const st = store.saveStatus();
   if (st.kind === 'memory') items.push({ label: 'Storage is blocked', hint: 'Changes won’t survive a reload · download a backup', icon: 'alert', href: '#/tools' });
+  if (sync.connected() && sync.state.error && sync.state.kind !== 'offline') items.push({ label: 'Sync needs attention', hint: sync.state.error, icon: 'alert', href: '#/settings' });
   if (!items.length) items.push({ label: 'You’re all caught up', hint: 'Nothing needs your attention right now', icon: 'checkCircle', fn: () => {} });
   menu(anchor, [{ heading: 'Notifications' }].concat(items), { align: 'end', cls: 'notif-pop' });
 }

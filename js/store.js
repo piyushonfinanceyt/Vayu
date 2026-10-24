@@ -9,9 +9,12 @@
      settings                        overrides on top of the plan settings (paths like phases.2.hrs)
      goals, tasks, schedule, habits, habitLogs, notes, milestones, lifeAreas, progress, sessions, resources, finance,
      arc, journal, logs, errors      collections of records with id / createdAt / updatedAt
-   Every write bumps `version` and notifies subscribers; the model (model.js) is recomputed from it. */
+   Every write bumps `version` and notifies subscribers; the model (model.js) is recomputed from it.
+   For merging copies between devices (merge.js, sync.js): plan records stamp each written field in _f, deletions
+   leave a tombstone in meta.tombs, and a replace (import, restore point, reset) sets meta.epoch. */
 import * as db from './db.js';
 import { clone, isObj, nv, todayStr, uid } from './util.js';
+import { canon, mergeData, changes } from './merge.js';
 
 const round2 = (x) => Math.round(x * 100) / 100;
 
@@ -137,13 +140,24 @@ const touch = (coll, id, rec, quiet) => { queueWrite('records', [coll, String(id
 export function put(coll, rec, opts) {
   const t = new Date().toISOString(), old = S[coll][rec.id];
   const out = Object.assign({}, rec, { createdAt: rec.createdAt || (old && old.createdAt) || t, updatedAt: t });
+  // defaults seeded on a new device carry _u: 0 ("never edited"), so they never win over your edited copy in a merge
+  if (opts && opts.seed) out._u = 0; else delete out._u;
   S[coll][out.id] = out;
   touch(coll, out.id, out, opts && opts.quiet);
   return out;
 }
 export const add = (coll, fields, prefix) => put(coll, Object.assign({ id: uid(prefix || coll.slice(0, 2)) }, fields));
 export function patch(coll, id, fields) { const old = S[coll][id]; if (!old) return null; return put(coll, Object.assign({}, old, fields)); }
-export function remove(coll, id) { if (!(id in S[coll])) return null; const old = S[coll][id]; delete S[coll][id]; touch(coll, id, undefined); return old; }
+export function remove(coll, id) { if (!(id in S[coll])) return null; const old = S[coll][id]; delete S[coll][id]; touch(coll, id, undefined); tomb(coll + '/' + id); return old; }
+// a deletion is remembered for 120 days, so a copy synced within that time doesn't bring the record back
+function tomb(key) {
+  const t = Date.now(), keep = t - 120 * 864e5, cur = S.meta.tombs || {}, next = {};
+  Object.keys(cur).forEach((k) => { if (cur[k] > keep) next[k] = cur[k]; });
+  next[key] = t;
+  S.meta.tombs = next;
+  saveMeta();
+}
+const stampFields = (f, keys, t) => { const o = Object.assign({}, f); keys.forEach((k) => { o[k] = t; }); return o; };
 export const get = (coll, id) => S[coll][id];
 export const list = (coll) => Object.keys(S[coll]).map((k) => S[coll][k]);
 
@@ -160,8 +174,9 @@ export function setRec(sec, id, field, value) {
   if (sec === 'chapters' && (field === 'rev1' || field === 'rev2')) extra[field + 'At'] = value ? (prev[field + 'At'] || today) : null;
   if (sec === 'mocks' && field === 'marks') { const md = prev.movedTo || MOCK_BY[id].date; extra.takenAt = value != null ? (prev.takenAt || (md <= today ? md : today)) : null; }
   if (sec === 'days' && field === 'status') extra.autoStatus = false;
-  const rec = Object.assign({}, prev, base, extra, { _u: Date.now() });
+  const t = Date.now(), rec = Object.assign({}, prev, base, extra, { _u: t });
   rec[field] = value;
+  rec._f = stampFields(prev._f, [field].concat(Object.keys(extra)), t);
   S[sec][id] = rec;
   batch(() => {
     touch(sec, String(id), rec);
@@ -171,7 +186,7 @@ export function setRec(sec, id, field, value) {
       const day = rec.doneOn || id, was = rec.autoTick;
       if (was && was !== day && DAY_IDX[was] != null && dayRec(was).workoutDone === 'Yes') setRec('days', was, 'workoutDone', null);
       if (DAY_IDX[day] != null && dayRec(day).workoutDone !== 'Yes') setRec('days', day, 'workoutDone', 'Yes');
-      if (was !== day) { rec.autoTick = day; S.runs[id] = rec; touch(sec, String(id), rec, true); }
+      if (was !== day) { rec.autoTick = day; rec._f = stampFields(rec._f, ['autoTick'], Date.now()); S.runs[id] = rec; touch(sec, String(id), rec, true); }
     }
     // finishing every chapter planned for a day marks that day Done (it feeds the streak, like the original rule)
     if (sec === 'chapters' && field === 'status' && CH_BY[id]) syncDayStatus(CH_BY[id].planned);
@@ -257,7 +272,7 @@ export function defaultGoals() {
 }
 function ensureDefaults() {
   S.meta.seeded = S.meta.seeded || {};
-  const seeded = S.meta.seeded, q = { quiet: true };
+  const seeded = S.meta.seeded, q = { quiet: true, seed: true };
   let changed = false;
   if (!seeded.lifeAreas) { defaultAreas().forEach((a) => put('lifeAreas', a, q)); seeded.lifeAreas = true; changed = true; }
   if (!seeded.goals) { defaultGoals().forEach((g) => put('goals', g, q)); seeded.goals = true; changed = true; }
@@ -285,7 +300,7 @@ async function firstRun() {
 function snapshotData() {
   const data = { settings: clone(S.settings) };
   COLLS.forEach((c) => { data[c] = clone(S[c]); });
-  data.meta = { seeded: clone(S.meta.seeded || {}) };
+  data.meta = { seeded: clone(S.meta.seeded || {}), tombs: clone(S.meta.tombs || {}), epoch: S.meta.epoch || 0 };
   return data;
 }
 // version 2 = the original app's full backup format (kept, so either app can read the other's file)
@@ -330,6 +345,8 @@ export async function importBackup(o, label) {
   });
   S.settings = isObj(data.settings) ? data.settings : {};
   if (full && data.meta && isObj(data.meta.seeded)) S.meta.seeded = Object.assign({}, S.meta.seeded, data.meta.seeded);
+  if (full) S.meta.tombs = data.meta && isObj(data.meta.tombs) ? clone(data.meta.tombs) : {};
+  S.meta.epoch = Date.now();   // with sync on, the replace reaches your other devices too
   ops.push({ s: 'meta', k: 'settings', v: S.settings }, { s: 'meta', k: 'meta', v: S.meta });
   // deletes first, then puts (same key may appear in both)
   await db.write(ops.filter((x) => x.v === undefined));
@@ -343,6 +360,38 @@ export async function restoreSnapshot(key) {
   if (!snap) throw new Error('Restore point not found');
   return importBackup({ app: 'final-comeback', version: 2, data: snap.data }, 'restore point');
 }
+
+// ---------- merging another copy in (sync, "Merge it in") ----------
+const KINDS = { legacy: LEGACY, lists: LISTS };
+export const snapshot = () => snapshotData();
+export const mergeWith = (mine, theirs, cutA, cutB) => mergeData(mine, theirs, Object.assign({ cutA, cutB }, KINDS));
+export const countChanges = (x, y) => changes(x, y, KINDS);
+// writes merged data into this device, changing only what differs; returns how many entries changed.
+// Synchronous up to the write-behind queue, so take the snapshot, merge and apply with no await in between.
+export function applyData(data, epoch, id) {
+  let n = 0;
+  COLLS.forEach((c) => {
+    const src = isObj(data[c]) ? data[c] : {};
+    Object.keys(S[c]).forEach((k) => { if (src[k] == null) { delete S[c][k]; queueWrite('records', [c, k], undefined); n++; } });
+    Object.keys(src).forEach((k) => { if (src[k] != null && canon(S[c][k]) !== canon(src[k])) { S[c][k] = clone(src[k]); queueWrite('records', [c, k], src[k]); n++; } });
+  });
+  if (canon(S.settings || {}) !== canon(data.settings || {})) { S.settings = clone(data.settings || {}); queueWrite('meta', 'settings', S.settings); n++; }
+  const m = isObj(data.meta) ? data.meta : {};
+  S.meta.seeded = Object.assign({}, S.meta.seeded, m.seeded);
+  S.meta.tombs = clone(m.tombs || {});
+  if (epoch != null) S.meta.epoch = epoch;
+  saveMeta();
+  if (n) emit({ coll: '*', id: id || 'sync' });
+  return n;
+}
+// "Merge it in": a backup file joins what's here instead of replacing it (newest edit wins, as in sync)
+export async function mergeBackup(o, label) {
+  const err = validateBackup(o);
+  if (err) throw new Error(err);
+  await saveSnapshot('pre-merge-' + Date.now(), 'Before merging ' + (label || 'a backup'));
+  const merged = mergeWith(snapshotData(), o.data, 0, 0);
+  return applyData(merged, null, 'merge');
+}
 export async function resetAll() {
   await flush();
   await saveSnapshot('pre-reset-' + Date.now(), 'Before “Reset all data”');
@@ -350,6 +399,8 @@ export async function resetAll() {
   COLLS.forEach((c) => { S[c] = {}; });
   S.settings = {};
   S.meta.seeded = {};
+  S.meta.tombs = {};
+  S.meta.epoch = Date.now();
   S.meta.welcomeDismissed = false;
   await db.write([{ s: 'meta', k: 'settings', v: S.settings }, { s: 'meta', k: 'meta', v: S.meta }]);
   ensureDefaults();
