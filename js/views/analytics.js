@@ -7,7 +7,7 @@ import { html, raw, esc, fmt1, fmtN, fmtD, fmtDS, plural, diff, addDays, sum, pc
 import { icon } from '../icons.js';
 import { card, chip, status, tile, meter } from '../components.js';
 import { spot, gauge } from '../charts.js';
-import { studyHeatmap, heatLegend, paperMultiples, paperBullets } from './insights.js';
+import { studyHeatmap, heatLegend, paperMultiples, paperBullets, passOutlook } from './insights.js';
 
 function scoreboard(M) {
   const R = M.readiness, gap = R.value - R.expected, st = M.st, F = M.F, t = M.t;
@@ -59,6 +59,7 @@ export default {
     const lifeCard = card({ cls: 'span-7', title: 'Life areas', icon: 'activity', sub: 'Each area’s progress to its own target · change them in Settings', actions: html`<span class="legend" style="margin:0">${areas.map((x) => html`<span><i class="key line" style="--c:${x.color}"></i>${x.name} ${Math.round(x.latest.value)}%</span>`)}</span>`, body: areas.length ? spot('an-life', 'line', { height: 220, x: { type: 'date', from: laFrom, to: M.t > laFrom ? M.t : addDays(laFrom, 7) }, y: { min: 0, max: 100, ticks: [0, 25, 50, 75, 100] }, fmtY: (v) => Math.round(v) + '%', series: areas.map((x) => ({ id: x.id, name: x.name, color: x.color, dots: false, points: x.points.filter((p, i) => i % 2 === 0 || i === x.points.length - 1).map((p) => ({ x: p.date, y: p.value })) })), ariaLabel: 'Progress in each life area over time' }) : html`<p class="muted">No life area has data yet.</p>` });
     const subj = card({ cls: 'span-5', title: 'Subject progress', icon: 'book', sub: 'Chapters done per paper', body: html`<ul class="hbars">${M.worlds.map((w) => html`<li><span class="row" style="gap:8px"><i class="dot" style="--c:${w.c}"></i>${w.code} ${w.short}</span><div class="hbar"><i style="width:${(w.pct * 100).toFixed(1)}%"></i></div><b class="num">${w.done}/${w.chapters}</b></li>`)}</ul>` });
     return html`${scoreboard(M)}${tiles}
+      ${passOutlook(M, { cls: 'ol-card' })}
       <div class="grid">${hoursBars}${cumCard}</div>
       ${paperMultiples(M, { prefix: 'amult-', title: 'Marks trend per paper' })}
       ${card({ title: 'Consistency', icon: 'calendar', sub: 'Every plan day, shaded by its share of the hours target', body: html`${heatLegend()}${studyHeatmap(M, { id: 'an-heat' })}` })}

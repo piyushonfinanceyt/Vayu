@@ -21,6 +21,8 @@ export const WORLDS = [
   { key: 'FM&SM', short: 'FM & SM', paper: 6, name: 'Financial Mgmt & Strategic Mgmt', grp: 'G2' }
 ].map((w) => Object.assign(w, { c: 'var(--p' + w.paper + ')', code: 'P' + w.paper }));
 export const WMAP = {}; WORLDS.forEach((w) => { WMAP[w.key] = w; });
+// CA Inter Jan 2027: Group I on 2, 4 and 6 Jan, Group II on 8, 10 and 12 Jan
+const EXAM_DAY = { 1: '2027-01-02', 2: '2027-01-04', 3: '2027-01-06', 4: '2027-01-08', 5: '2027-01-10', 6: '2027-01-12' };
 export const GOAL_SOURCES = {
   manual: 'Set the % yourself', readiness: 'Average of syllabus, revision, mocks and hours', syllabus: 'Chapters completed',
   hours: 'Study hours vs plan', revision: 'R2 + R3 revision ticks', mocks: 'Full mocks taken', run: '2 km time-trial progress',
@@ -238,6 +240,43 @@ function computeGame(st, t) {
     });
   });
 
+  // ---------- pass outlook: each paper's likely exam score from its full papers, against ICAI's rules ----------
+  // Pass a group: 40 in every paper and 50% aggregate (150 of 300). A paper with 60+ is exempted if its group isn't cleared.
+  // Likely score = recent form (the last 3 papers, newest counts most) + half the trend until that paper's exam day,
+  // capped at ±10. The range is the spread of recent scores (5–15 marks), wider while there are few papers.
+  const outlookFor = (w) => {
+    const pts = sortBy(mocks.filter((m) => m.subject === w.key && m.score != null), (m) => m.date).map((m) => ({ date: m.date, v: m.score * 100 }));
+    const examDay = EXAM_DAY[w.paper], n = pts.length;
+    if (!n) return Object.assign({}, w, { n: 0, examDay, status: 'none', need: null });
+    const rec = pts.slice(-3), base = rec.reduce((a, p, i) => a + p.v * (i + 1), 0) / rec.reduce((a, p, i) => a + i + 1, 0);
+    let gain = 0;
+    if (n >= 3) {
+      const xs = pts.map((p) => diff(pts[0].date, p.date)), mx = sum(xs) / n, my = sum(pts, (p) => p.v) / n;
+      const sxx = sum(xs, (x) => (x - mx) * (x - mx)), slope = sxx ? xs.reduce((a, x, i) => a + (x - mx) * (pts[i].v - my), 0) / sxx : 0;
+      gain = clamp(slope * diff(pts[n - 1].date, examDay) * 0.5, -10, 10);
+    }
+    const last5 = pts.slice(-5), m5 = sum(last5, (p) => p.v) / last5.length;
+    const sd = last5.length > 1 ? Math.sqrt(sum(last5, (p) => (p.v - m5) * (p.v - m5)) / (last5.length - 1)) : 0;
+    const band = n === 1 ? 12 : clamp(sd, 5, 15) + (n < 3 ? 4 : 0);
+    const likely = Math.round(clamp(base + gain, 0, 100)), low = Math.round(clamp(likely - band, 0, 100)), high = Math.round(clamp(likely + band, 0, 100));
+    const status = likely >= 60 && low >= 40 ? 'strong' : low >= 40 ? 'safe' : likely >= 40 ? 'risk' : 'below';
+    return Object.assign({}, w, { n, examDay, likely, low, high, gain: Math.round(gain), last: Math.round(pts[n - 1].v), status, need: Math.max(0, 40 - low) });
+  };
+  const olPapers = WORLDS.map(outlookFor);
+  const olGroups = [['G1', 'Group I'], ['G2', 'Group II']].map(([id, name]) => {
+    const ps = olPapers.filter((p) => p.grp === id), known = ps.filter((p) => p.n);
+    const sumLikely = sum(known, (p) => p.likely), sumLow = sum(known, (p) => p.low);
+    const verdict = known.length < ps.length ? 'incomplete'
+      : ps.every((p) => p.low >= 40) && sumLow >= 150 ? 'pass'
+        : ps.every((p) => p.likely >= 40) && sumLikely >= 150 ? 'borderline' : 'notyet';
+    return { id, name, papers: ps, known: known.length, sumLikely, sumLow, needAgg: known.length === ps.length ? Math.max(0, 150 - sumLikely) : null, verdict, dates: ps.map((p) => p.examDay) };
+  });
+  // the paper that most threatens a pass: furthest below 40 on a bad day; failing that, the lowest in a group short on aggregate
+  const olKnown = olPapers.filter((p) => p.n);
+  let weakest = sortBy(olKnown.filter((p) => p.low < 40), (p) => p.low)[0] || null;
+  if (!weakest) { const g = olGroups.find((x) => x.needAgg > 0); if (g) weakest = sortBy(g.papers, (p) => p.likely)[0]; }
+  const outlook = { papers: olPapers, groups: olGroups, weakest, taken: olKnown.length };
+
   const nWeeks = Math.floor(diff(ws, LAST) / 7) + 1;
   const weeks = [];
   for (let w = 1; w <= nWeeks; w++) {
@@ -284,7 +323,7 @@ function computeGame(st, t) {
   const nextFight = sortBy(mocks.filter((m) => m.date >= t && m.marks == null && m.status !== 'skipped'), (m) => m.date)[0] || null;
 
   return {
-    st, t, FIRST, LAST, days, dayByDate, chapters, mocks, runs, worlds, weeks, badges, ranks, hrsFor, targetSec, targetFor, cpIndex, runMon, runWeeks, phases,
+    st, t, FIRST, LAST, days, dayByDate, chapters, mocks, runs, worlds, outlook, weeks, badges, ranks, hrsFor, targetSec, targetFor, cpIndex, runMon, runWeeks, phases,
     xp: xpTotal, level, lvStart, lvNext, lvProg: clamp01((xpTotal - lvStart) / (lvNext - lvStart)), rank, nextRank,
     hoursTarget, hoursLogged, done, behind, onPace: behind <= 0,
     power, parts, powerLabel, streak, bestStreak, avgNow, avgAug, mult: avgNow && avgAug ? avgNow / avgAug : 0,

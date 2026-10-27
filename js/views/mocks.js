@@ -8,7 +8,7 @@ import { card, chip, status, tile, empty, toast, confirm, modal } from '../compo
 import { spot, bullet } from '../charts.js';
 import { numField, textField, bind } from './parts.js';
 import { isOpen } from '../prefs.js';
-import { paperMultiples } from './insights.js';
+import { paperMultiples, passOutlook } from './insights.js';
 import * as store from '../store.js';
 
 let focusId = null;
@@ -128,7 +128,7 @@ export default {
     const mk = M.mocks.find((x) => x.date === M.t && x.status !== 'skipped');
     return { title: 'Mock Tests', actions: mk ? raw('<a class="btn primary" href="#/mocks?id=' + mk.id + '">' + icon('edit') + 'Today · mock #' + mk.id + ' ' + esc(mk.subject) + '</a>') : '' };
   },
-  render(M) { return html`${stats(M)}${paperMultiples(M)}<div class="grid">${scorecard(M)}${roster(M)}</div>${series(M)}`; },
+  render(M) { return html`${stats(M)}${passOutlook(M, { cls: 'ol-card' })}${paperMultiples(M)}<div class="grid">${scorecard(M)}${roster(M)}</div>${series(M)}`; },
   after(root) {
     paintPhotos(root);
     if (focusId) { const el = document.getElementById('mock-' + focusId); if (el) { setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); } focusId = null; }
