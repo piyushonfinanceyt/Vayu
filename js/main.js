@@ -6,7 +6,8 @@ import { model } from './model.js';
 import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now } from './util.js';
 import { toast, menu, closeMenu, menuOpen, modalOpen } from './components.js';
 import { drawAll } from './charts.js';
-import { applyTheme, setTheme, resolvedTheme, onSystemTheme, setOpen } from './prefs.js';
+import { applyTheme, setTheme, resolvedTheme, onSystemTheme, setOpen, setPref } from './prefs.js';
+import { openReview, promptWeek } from './weekly.js';
 import { buildShell, layoutTabs, placeIndicator, moreMenu, moreSheet, notifications, profileMenu, shortcutsHelp } from './shell.js';
 import { onRoute, render, renderSoon, currentView, current, go, prefetch } from './router.js';
 import { openPalette, isOpen as paletteOpen } from './palette.js';
@@ -41,7 +42,9 @@ export const GLOBAL = {
   'chapter-toggle': (el) => store.setRec('chapters', el.dataset.id, 'status', el.getAttribute('aria-checked') === 'true' ? 'pending' : 'done'),
   'workout-toggle': (el) => store.setRec('days', el.dataset.date, 'workoutDone', el.getAttribute('aria-checked') === 'true' ? null : 'Yes'),
   'task-toggle': (el) => { const t = store.get('tasks', el.dataset.id); if (t) store.patch('tasks', t.id, { done: !t.done, doneAt: !t.done ? todayStr() : null }); },
-  welcome: () => store.setMeta('welcomeDismissed', true)
+  welcome: () => store.setMeta('welcomeDismissed', true),
+  review: () => { openReview(model()); renderSoon(); },
+  'review-later': () => { setPref('reviewSeen', promptWeek(todayStr())); renderSoon(); }
 };
 function dispatch(name, el, e) {
   const v = currentView(), fn = (v && v.actions && v.actions[name]) || GLOBAL[name];

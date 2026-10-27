@@ -550,3 +550,36 @@
 .drill-done h3 { margin: 0; font-size: 20px; font-weight: 500; }
 .drill-done p { margin: 0; }
 @media (max-width: 600px) { .drill-foot .btn { flex: 1; justify-content: center; } .drill-foot .kbd { display: none; } }
+
+/* ================= Week in review ================= */
+.review-prompt { margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
+.review-prompt > svg, .review-prompt > .ic { width: 22px; height: 22px; color: var(--ink-3); flex: none; }
+.review-prompt p { margin: 0; }
+.wr { display: grid; gap: 16px; }
+.wr-nav { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.wr-nav b { font-weight: 500; font-size: 15px; min-width: 150px; text-align: center; }
+.wr-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.wr-tile { background: var(--soft); border-radius: var(--r-md); padding: 12px 14px; display: grid; gap: 2px; min-width: 0; }
+.wr-tile b { font-size: 26px; font-weight: 500; letter-spacing: -.02em; }
+.wr-tile small { color: var(--ink-3); font-size: 12px; }
+.wr-tile .wr-d { color: var(--ink-2); }
+.wr-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.wr-day { display: grid; justify-items: center; gap: 4px; font-size: 12px; color: var(--ink-3); }
+.wr-day small { color: var(--ink); font-size: 12.5px; }
+.wr-bar { position: relative; width: 100%; max-width: 44px; height: 90px; }
+.wr-bar i { position: absolute; bottom: 0; border-radius: 6px 6px 3px 3px; }
+.wr-bar i.t { left: 0; right: 0; background: var(--soft-2); }
+.wr-bar i.v { left: 22%; right: 22%; background: var(--ink); }
+.wr-bar i.v.best { background: var(--brand); }
+.wr-day.future { opacity: .5; }
+.wr-list { display: grid; gap: 8px; font-size: 13.5px; }
+.wr-list li { display: flex; gap: 10px; align-items: flex-start; }
+.wr-list svg { width: 16px; height: 16px; flex: none; margin-top: 2px; color: var(--ink-3); }
+.wr-focus { display: grid; gap: 6px; padding: 16px 18px; border-radius: var(--r-md); background: var(--brand); color: var(--on-brand); text-decoration: none; }
+.wr-focus .lbl { color: color-mix(in srgb, var(--on-brand) 75%, transparent); }
+.wr-f { display: flex; gap: 10px; align-items: flex-start; }
+.wr-f svg { width: 20px; height: 20px; flex: none; margin-top: 2px; }
+.wr-f b { font-weight: 500; font-size: 15px; line-height: 1.4; }
+.wr-also ul { margin-top: 6px; display: grid; gap: 6px; font-size: 13px; }
+.wr-also a { color: var(--ink-2); }
+@media (max-width: 700px) { .wr-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

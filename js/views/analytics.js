@@ -8,6 +8,10 @@ import { icon } from '../icons.js';
 import { card, chip, status, tile, meter } from '../components.js';
 import { spot, gauge } from '../charts.js';
 import { studyHeatmap, heatLegend, paperMultiples, paperBullets, passOutlook } from './insights.js';
+import { openReview } from '../weekly.js';
+import { model as modelOf } from '../model.js';
+
+let reviewOnEnter = false;
 
 function scoreboard(M) {
   const R = M.readiness, gap = R.value - R.expected, st = M.st, F = M.F, t = M.t;
@@ -30,7 +34,9 @@ function scoreboard(M) {
 }
 
 export default {
-  head(M) { return { title: 'Analytics', sub: raw(esc('Readiness ' + Math.round(M.readiness.value) + ' of 100 · ' + plural(M.daysToExam(), 'day') + ' to Paper 1 · ' + fmtN(M.hoursLogged) + ' hours logged')) }; },
+  enter(q) { reviewOnEnter = !!q.review; },
+  after() { if (reviewOnEnter) { reviewOnEnter = false; setTimeout(() => openReview(modelOf()), 80); } },
+  head(M) { return { title: 'Analytics', actions: raw('<button type="button" class="btn" data-act="review">' + icon('analytics') + 'Week in review</button>'), sub: raw(esc('Readiness ' + Math.round(M.readiness.value) + ' of 100 · ' + plural(M.daysToExam(), 'day') + ' to Paper 1 · ' + fmtN(M.hoursLogged) + ' hours logged')) }; },
   render(M) {
     const a = M.analytics, K = M.kpi;
     const tiles = html`<div class="tiles six">

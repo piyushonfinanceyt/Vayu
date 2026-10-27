@@ -11,6 +11,7 @@
 import * as store from './store.js';
 import * as arc from './arc.js';
 import { errDue } from './drill.js';
+import { pref } from './prefs.js';
 import { diff, addDays, mondayOf, sum, clamp, clamp01, fmt1, fmtN, fmtD, fmtDS, mmss, plural, sortBy, todayStr, parseHours, timeToMin, now } from './util.js';
 
 export const WORLDS = [
@@ -665,6 +666,8 @@ function computeAll() {
   if (behindGoals.length) notes.push({ id: 'goals', icon: 'target', tone: 'warn', title: plural(behindGoals.length, 'goal') + ' behind schedule', body: behindGoals.slice(0, 2).map((g) => g.title).join(' · '), href: '#/goals' });
   const errDueN = store.list('errors').filter((e) => errDue(e, t)).length;
   if (errDueN) notes.push({ id: 'errors', icon: 'revision', tone: 'info', title: plural(errDueN, 'mistake') + ' due for review', body: 'Drill them · about a minute each', href: '#/errors?drill=1' });
+  // Sunday evening: the week in review (until it's opened)
+  if (new Date(t + 'T12:00:00').getDay() === 0 && new Date().getHours() >= 17 && pref('reviewSeen') !== mondayOf(t)) notes.push({ id: 'review', icon: 'analytics', tone: 'info', title: 'Your week in review is ready', body: 'Hours, chapters, papers and one focus for next week', href: '#/analytics?review=1' });
   M.notifications = notes;
 
   // ---------- analytics metrics ----------

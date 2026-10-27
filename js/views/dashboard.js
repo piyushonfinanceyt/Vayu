@@ -11,6 +11,7 @@ import { recSeg, numField, hoursStepper, bind, dayStatusChip } from './parts.js'
 import * as store from '../store.js';
 import * as arc from '../arc.js';
 import * as pwa from '../pwa.js';
+import { promptWeek } from '../weekly.js';
 
 const STATUS_TONE = { ahead: 'good', ontrack: 'good', done: 'good', behind: 'warn', overdue: 'bad', upcoming: '', nodata: '' };
 
@@ -197,7 +198,9 @@ export default {
   },
   render(M) {
     const B = blockState(M);
-    return html`${welcome(M)}
+    const wk = promptWeek(M.t);
+    const review = wk ? html`<section class="notice review-prompt" role="region" aria-label="Week in review">${icon('analytics')}<div class="grow"><p><b>Your week in review is ready</b> · ${fmtDS(wk)} – ${fmtDS(addDays(wk, 6))}</p><p class="muted">Hours, chapters, papers and mistakes against last week, with one focus for next week.</p></div><div class="row wrap"><button type="button" class="btn sm primary" data-act="review">Open the review</button><button type="button" class="btn sm ghost" data-act="review-later">Not now</button></div></section>` : '';
+    return html`${welcome(M)}${review}
       <div class="grid dash-r1">${countdown(M)}${timetableCard(M, B)}</div>
       <div class="grid dash-r2"><div class="meters span-8">${targetMeters(M)}</div>${nextUp(M, B)}</div>
       <div class="grid dash-r3">${planCard(M)}${logCard(M)}${runCard(M)}</div>
