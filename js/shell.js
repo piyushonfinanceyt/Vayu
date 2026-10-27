@@ -6,6 +6,7 @@ import { menu, modal } from './components.js';
 import { resolvedTheme } from './prefs.js';
 import * as store from './store.js';
 import * as sync from './sync.js';
+import { errDue } from './drill.js';
 
 export const ROUTES = [
   { id: 'dashboard', title: 'Dashboard', icon: 'dashboard', group: 1 },
@@ -31,7 +32,7 @@ export const ROUTES = [
 ];
 export const routeById = (id) => ROUTES.find((r) => r.id === id) || ROUTES[0];
 const examOn = () => { const st = store.settings(); return !!st.examMode && todayStr() <= (st.examModeEnd || '2027-01-12'); };
-export const errDue = (e, t) => !e.fixed && (!e.reviewedAt || diff(e.reviewedAt, t) >= 3);
+export { errDue };
 const inPill = (r) => r.group === 1 && !(examOn() && r.examHide);
 
 // Vayu: a V with arms raised in flight and a dot riding the wind above its right arm

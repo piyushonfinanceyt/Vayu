@@ -10,6 +10,7 @@
    Study hours and runs follow the plan's own (non-linear) pace instead of a straight line. */
 import * as store from './store.js';
 import * as arc from './arc.js';
+import { errDue } from './drill.js';
 import { diff, addDays, mondayOf, sum, clamp, clamp01, fmt1, fmtN, fmtD, fmtDS, mmss, plural, sortBy, todayStr, parseHours, timeToMin, now } from './util.js';
 
 export const WORLDS = [
@@ -662,8 +663,8 @@ function computeAll() {
   if (at && !at.clean && at.need > 0 && new Date().getHours() >= 18) notes.push({ id: 'arc', icon: 'snow', tone: 'info', title: 'Winter Arc · ' + plural(at.need, 'more habit') + ' for a clean day', body: at.done + ' of ' + M.arc.n + ' done today · streak ' + M.arc.streak, href: '#/winter-arc' });
   const behindGoals = M.goals.filter((g) => g.status === 'behind' || g.status === 'overdue');
   if (behindGoals.length) notes.push({ id: 'goals', icon: 'target', tone: 'warn', title: plural(behindGoals.length, 'goal') + ' behind schedule', body: behindGoals.slice(0, 2).map((g) => g.title).join(' · '), href: '#/goals' });
-  const errDueN = store.list('errors').filter((e) => !e.fixed && (!e.reviewedAt || diff(e.reviewedAt, t) >= 3)).length;
-  if (errDueN) notes.push({ id: 'errors', icon: 'revision', tone: 'info', title: plural(errDueN, 'mistake') + ' due for review', body: 'Error Book · 20 minutes, oldest first', href: '#/errors' });
+  const errDueN = store.list('errors').filter((e) => errDue(e, t)).length;
+  if (errDueN) notes.push({ id: 'errors', icon: 'revision', tone: 'info', title: plural(errDueN, 'mistake') + ' due for review', body: 'Drill them · about a minute each', href: '#/errors?drill=1' });
   M.notifications = notes;
 
   // ---------- analytics metrics ----------

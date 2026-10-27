@@ -1,10 +1,11 @@
-/* Error Book: every lost mark by paper, chapter and error type. A review queue (a mistake is due again 3 days after
-   its last review), the week's biggest leaks with the fix for each type, open marks by paper, and every entry. */
-import { html, raw, esc, fmt1, fmtD, plural, diff, sortBy, sum, isDate, todayStr } from '../util.js';
+/* Error Book: every lost mark by paper, chapter and error type. A review queue with a drill (spaced repeats, see
+   drill.js: a card shows the mistake, you recall the rule, then mark Got it or Missed it), the week's biggest leaks
+   with the fix for each type, open marks by paper, and every entry. */
+import { html, raw, esc, fmt1, fmtD, plural, diff, sortBy, sum, isDate, todayStr, addDays } from '../util.js';
 import { icon } from '../icons.js';
-import { card, chip, tile, empty, toast, menu, form } from '../components.js';
+import { card, chip, tile, empty, toast, menu, form, modal } from '../components.js';
 import { isOpen } from '../prefs.js';
-import { errDue } from '../shell.js';
+import { errDue, grade, nextText, GAPS } from '../drill.js';
 import * as store from '../store.js';
 
 export const ERR_TYPES = [
@@ -22,17 +23,80 @@ export const ERR_TYPES = [
 const ERR_BY = {}; ERR_TYPES.forEach((e) => { ERR_BY[e[0]] = e; });
 const PAPERS = [['Accounts', 'P1 Accounts'], ['Law', 'P2 Law'], ['Tax', 'P3 Tax'], ['Costing', 'P4 Costing'], ['Audit', 'P5 Audit'], ['FM&SM', 'P6 FM & SM']];
 const paperName = (k) => (PAPERS.find((p) => p[0] === k) || [k, k])[1];
-let preset = {};
+let preset = {}, drillOnEnter = false;
 
 function row(M, e) {
-  return html`<li class="err ${e.fixed ? 'fixed' : ''}"><span class="li-main"><b>${e.chapter || e.note || 'Mistake'}</b><small>${fmtD(e.date)} · ${paperName(e.paper)}${e.source ? ' · ' + e.source : ''}${e.reviews ? ' · reviewed ' + plural(e.reviews, 'time') : ''}</small>${e.note && e.chapter ? html`<span class="err-rule">${icon('info')}${e.note}</span>` : ''}</span>
+  return html`<li class="err ${e.fixed ? 'fixed' : ''}"><span class="li-main"><b>${e.chapter || e.note || 'Mistake'}</b><small>${fmtD(e.date)} · ${paperName(e.paper)}${e.source ? ' · ' + e.source : ''}${e.reviews ? ' · drilled ' + plural(e.reviews, 'time') : ''}${e.dueOn && !e.fixed ? ' · next ' + fmtD(e.dueOn) : ''}</small>${e.note && e.chapter ? html`<span class="err-rule">${icon('info')}${e.note}</span>` : ''}</span>
     ${chip((ERR_BY[e.type] || [e.type, e.type])[1], 'line')}<b class="err-marks num">−${fmt1(+e.marks || 0)}</b>
-    <span class="row" style="gap:4px">${e.fixed ? '' : html`<button type="button" class="btn sm" data-act="err-review" data-id="${e.id}">${icon('check')}Reviewed</button>`}<button type="button" class="icon-btn sm" data-act="err-menu" data-id="${e.id}" aria-label="More for this mistake" aria-haspopup="menu">${icon('moreV')}</button></span></li>`;
+    <span class="row" style="gap:4px">${e.fixed ? '' : html`<button type="button" class="btn sm" data-act="err-review" data-id="${e.id}" title="Counts as Got it in the drill">${icon('check')}Reviewed</button>`}<button type="button" class="icon-btn sm" data-act="err-menu" data-id="${e.id}" aria-label="More for this mistake" aria-haspopup="menu">${icon('moreV')}</button></span></li>`;
+}
+
+// ---------- drill: one card at a time, recall the rule, then Got it / Missed it ----------
+const dueList = (t) => sortBy(store.list('errors').filter((e) => errDue(e, t)), (e) => (e.dueOn || e.reviewedAt || e.date || '') + (e.createdAt || ''));
+const practiceList = () => sortBy(store.list('errors').filter((e) => !e.fixed), (e) => String(+e.box || 0) + (e.dueOn || e.date || ''));
+function openDrill(list, label) {
+  if (!list.length) { toast('Nothing to drill right now'); return; }
+  const t = todayStr(), queue = list.slice(0, 20).map((e) => e.id), tally = { got: 0, missed: 0, fixed: 0 };
+  let i = 0, shown = false, said = '';
+  const m = modal({ title: label, body: raw('<div class="drill" aria-live="polite"></div>'), foot: raw('<div class="drill-foot"></div>') });
+  const box = m.el.querySelector('.drill'), foot = m.el.querySelector('.drill-foot');
+  const paint = () => {
+    if (i >= queue.length) {
+      box.innerHTML = String(html`<div class="drill-done">${icon('checkCircle')}<h3>${plural(queue.length, 'mistake')} drilled</h3>
+        <p>${tally.got} got it · ${tally.missed} missed${tally.missed ? ', back tomorrow' : ''}${tally.fixed ? ' · ' + tally.fixed + ' fixed for good' : ''}</p>
+        <p class="muted small">Missed ones drop to the first box and come back tomorrow. Each Got it lengthens the gap: ${GAPS.join(', ')} days, then it’s fixed for good.</p></div>`);
+      foot.innerHTML = String(html`<button type="button" class="btn primary" data-done autofocus>Done</button>`);
+      foot.querySelector('[data-done]').focus();
+      return;
+    }
+    const e = store.get('errors', queue[i]);
+    if (!e) { i++; paint(); return; }
+    const ty = ERR_BY[e.type] || [e.type, e.type, ''], b = Math.min(+e.box || 0, GAPS.length - 1);
+    box.innerHTML = String(html`<div class="drill-top"><span>${i + 1} of ${queue.length}</span>${said ? html`<span class="drill-said">${said}</span>` : ''}<span class="drill-boxes" role="img" aria-label="${'Box ' + (b + 1) + ' of ' + GAPS.length}">${GAPS.map((g, k) => html`<i class="${k <= b && e.box != null ? 'on' : ''}"></i>`)}</span></div>
+      <article class="drill-card">
+        <div class="row wrap" style="gap:6px">${chip(paperName(e.paper), 'line')}${chip(ty[1], 'line')}<span class="muted small">−${fmt1(+e.marks || 0)} marks · ${fmtD(e.date)}${e.source ? ' · ' + e.source : ''}</span></div>
+        <h3>${e.chapter || 'A mistake in ' + paperName(e.paper)}</h3>
+        <p class="drill-q">${e.note ? 'Say the rule that stops this mistake, then check.' : 'Recall what went wrong here and how to avoid it, then check.'}</p>
+        ${shown ? html`<div class="drill-a">${e.note ? html`<span class="lbl">Your rule</span><p class="drill-rule">${e.note}</p>` : ''}<span class="lbl">The fix for ${ty[1].toLowerCase()} mistakes</span><p>${ty[2]}</p></div>` : ''}
+      </article>`);
+    foot.innerHTML = String(shown
+      ? html`<button type="button" class="btn" data-g="0">${icon('x')}Missed it <span class="kbd">1</span></button><button type="button" class="btn primary" data-g="1">${icon('check')}Got it <span class="kbd">2</span></button>`
+      : html`<button type="button" class="btn primary" data-flip>${icon('eye')}Show the rule <span class="kbd">Space</span></button>`);
+    (foot.querySelector('[data-g="1"]') || foot.querySelector('[data-flip]')).focus();
+  };
+  const answer = (ok) => {
+    const e = store.get('errors', queue[i]);
+    if (e) {
+      const p = grade(e, ok, t);
+      store.patch('errors', e.id, p);
+      if (ok) tally.got++; else tally.missed++;
+      if (p.fixed) tally.fixed++;
+      said = (ok ? 'Got it' : 'Missed') + ' · ' + nextText(p, t);
+    }
+    i++; shown = false; paint();
+  };
+  foot.addEventListener('click', (ev) => {
+    if (ev.target.closest('[data-flip]')) { shown = true; paint(); }
+    const g = ev.target.closest('[data-g]'); if (g) answer(g.dataset.g === '1');
+    if (ev.target.closest('[data-done]')) m.close();
+  });
+  m.el.addEventListener('keydown', (ev) => {
+    if (ev.target.matches('input, textarea, select') || i >= queue.length) return;
+    if (ev.key === ' ' && !shown) { ev.preventDefault(); shown = true; paint(); }
+    else if (shown && (ev.key === '1' || ev.key === 'ArrowLeft')) { ev.preventDefault(); answer(false); }
+    else if (shown && (ev.key === '2' || ev.key === 'ArrowRight')) { ev.preventDefault(); answer(true); }
+  });
+  paint();
 }
 
 export default {
-  enter(q) { preset = { paper: q.paper || '', mock: q.mock || '' }; },
-  head(M) { const due = store.list('errors').filter((e) => errDue(e, M.t)).length; return { title: 'Error Book', sub: raw(esc((due ? plural(due, 'mistake') + ' due for review · ' : 'Nothing due · ') + 'Block D every evening: one line per lost mark, with the rule that stops it next time')) }; },
+  enter(q) { preset = { paper: q.paper || '', mock: q.mock || '' }; drillOnEnter = !!q.drill; },
+  head(M) {
+    const due = store.list('errors').filter((e) => errDue(e, M.t)).length;
+    return { title: 'Error Book', sub: raw(esc((due ? plural(due, 'mistake') + ' due for review · ' : 'Nothing due · ') + 'Block D every evening: one line per lost mark, with the rule that stops it next time')),
+      actions: due ? raw('<button type="button" class="btn primary" data-act="err-drill">' + icon('revision') + 'Drill ' + due + ' due</button>') : '' };
+  },
+  after() { if (drillOnEnter) { drillOnEnter = false; setTimeout(() => openDrill(dueList(todayStr()), 'Drill · due today'), 80); } },
   render(M) {
     const t = M.t, all = sortBy(store.list('errors'), (e) => (e.date || '') + (e.createdAt || '')).reverse();
     const wk = all.filter((e) => e.date && e.date <= t && diff(e.date, t) < 7);
@@ -54,7 +118,10 @@ export default {
         <button type="button" class="btn primary wide" data-act="err-add">${icon('plus')}Log mistake</button>
         <datalist id="er-chapters">${M.chapters.map((c) => html`<option value="${c.name}"></option>`)}</datalist></div>`
     });
-    const queue = card({ cls: 'span-6', title: 'Review queue', icon: 'revision', sub: 'Due 3 days after the last review', actions: chip(due.length + ' due', due.length ? 'ink' : ''), body: due.length ? html`<ul class="list">${due.slice(0, 12).map((e) => row(M, e))}</ul>${due.length > 12 ? html`<p class="hint">${due.length - 12} more due after these.</p>` : ''}` : empty('Nothing due. A mistake comes back here 3 days after you last reviewed it.', '', 'checkCircle') });
+    const queue = card({ cls: 'span-6', title: 'Review queue', icon: 'revision', sub: 'Spaced repeats: back after ' + GAPS.join(', ') + ' days, then fixed for good',
+      actions: due.length ? html`<button type="button" class="btn sm primary" data-act="err-drill">${icon('revision')}Drill ${due.length}</button>` : chip('0 due'),
+      body: due.length ? html`<ul class="list">${due.slice(0, 12).map((e) => row(M, e))}</ul>${due.length > 12 ? html`<p class="hint">${due.length - 12} more due after these.</p>` : ''}`
+        : empty(openE.length ? 'Nothing due today. Practising early still moves each mistake along its schedule.' : 'Nothing due. A new mistake comes up for its first drill the day after you log it.', openE.length ? html`<button type="button" class="btn sm" data-act="err-drill-all">${icon('revision')}Practise all ${openE.length} open</button>` : '', 'checkCircle') });
     const maxT = top.length ? byType[top[0]] : 1, byPaper = {};
     openE.forEach((e) => { byPaper[e.paper] = (byPaper[e.paper] || 0) + (+e.marks || 0); });
     const maxP = Math.max(1, ...Object.values(byPaper));
@@ -71,16 +138,18 @@ export default {
       const v = (id) => ((document.getElementById(id) || {}).value || '').trim();
       const date = v('er-date'), marks = +v('er-marks') || 0;
       if (!isDate(date) || (!v('er-ch') && !v('er-note'))) { toast('Add the chapter or the rule, and the date.', { tone: 'warn' }); return; }
-      store.add('errors', { date, paper: v('er-paper'), chapter: v('er-ch'), type: v('er-type'), marks, source: v('er-src'), note: v('er-note'), fixed: false, reviews: 0, reviewedAt: null }, 'er');
+      store.add('errors', { date, paper: v('er-paper'), chapter: v('er-ch'), type: v('er-type'), marks, source: v('er-src'), note: v('er-note'), fixed: false, reviews: 0, reviewedAt: null, dueOn: addDays(todayStr(), 1) }, 'er');
       ['er-ch', 'er-marks', 'er-note'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = ''; });
-      toast('Mistake logged · it comes back for review in 3 days');
+      toast('Mistake logged · first drill tomorrow');
     },
-    'err-review': (el) => { const e = store.get('errors', el.dataset.id); if (e) { store.patch('errors', e.id, { reviewedAt: todayStr(), reviews: (+e.reviews || 0) + 1 }); toast('Reviewed · back in 3 days'); } },
+    'err-drill': () => openDrill(dueList(todayStr()), 'Drill · due today'),
+    'err-drill-all': () => openDrill(practiceList(), 'Practice · open mistakes'),
+    'err-review': (el) => { const e = store.get('errors', el.dataset.id); if (e) { const t = todayStr(), p = grade(e, true, t); store.patch('errors', e.id, p); toast('Reviewed · ' + nextText(p, t)); } },
     'err-menu': (el) => {
       const e = store.get('errors', el.dataset.id); if (!e) return;
       menu(el, [
         { label: 'Edit', icon: 'edit', fn: () => form({ title: 'Edit mistake', fields: [{ name: 'date', label: 'Date', type: 'date', half: true, required: true }, { name: 'paper', label: 'Paper', type: 'select', half: true, options: PAPERS }, { name: 'chapter', label: 'Chapter' }, { name: 'type', label: 'Error type', type: 'select', half: true, options: ERR_TYPES.map((x) => [x[0], x[1]]) }, { name: 'marks', label: 'Marks lost', type: 'number', min: 0, step: 0.5, half: true }, { name: 'source', label: 'Source' }, { name: 'note', label: 'The rule' }], values: e, onSubmit: (v) => { store.put('errors', Object.assign({}, e, v)); toast('Saved'); } }) },
-        { label: e.fixed ? 'Reopen' : 'Fixed for good', icon: e.fixed ? 'reset' : 'checkCircle', fn: () => store.patch('errors', e.id, { fixed: !e.fixed }) },
+        { label: e.fixed ? 'Reopen' : 'Fixed for good', icon: e.fixed ? 'reset' : 'checkCircle', fn: () => store.patch('errors', e.id, e.fixed ? { fixed: false, box: 0, dueOn: addDays(todayStr(), 1) } : { fixed: true, fixedAt: todayStr(), dueOn: null }) },
         '-',
         { label: 'Delete', icon: 'trash', fn: () => { const old = store.remove('errors', e.id); toast('Mistake deleted', { action: { label: 'Undo', fn: () => store.put('errors', old) } }); } }
       ], { align: 'end' });
