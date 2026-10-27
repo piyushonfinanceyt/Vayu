@@ -518,3 +518,14 @@
 .key.ol-k-tick.ex { background: transparent; border-left: 2px dotted var(--ink-3); }
 @media (max-width: 860px) { .ol-groups { grid-template-columns: minmax(0, 1fr); } }
 .ol-card { margin-bottom: 14px; }
+
+/* ================= Catch up (Study Plan) ================= */
+.catchup { margin-bottom: 14px; }
+.cu-verdict { margin-top: 14px; }
+.cu-verdict p { margin: 0; }
+.cu-verdict.warn { background: var(--warn-bg); border-color: transparent; }
+.cu-verdict.warn > svg, .cu-verdict.warn .ic { color: var(--warn); }
+.cu-days li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 14px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.cu-d b { font-weight: 500; display: block; } .cu-d small { color: var(--ink-3); font-size: 12px; }
+.cu-ch { color: var(--ink-2); }
+@media (max-width: 600px) { .cu-days li { grid-template-columns: minmax(0, 1fr); } }

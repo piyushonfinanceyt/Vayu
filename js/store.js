@@ -86,7 +86,9 @@ export function dayRec(date) {
   const p = D.days[DAY_IDX[date]], l = (p && p.log) || {};
   return pick({ hrs: nv(l.hrs), status: DAY_ST[l.status] || null, pages: nv(l.pages), book: l.book || '', workoutDone: l.workoutDone || null, steps: nv(l.steps), pushups: nv(l.pushups), meals: l.meals || null, notes: l.notes || '' }, S.days[date]);
 }
-export const chRec = (c) => pick({ status: CH_ST[c.status] || 'pending', rev1: c.rev1 === '✓', rev2: c.rev2 === '✓', questions: c.questions || null, notes: c.notes || '' }, S.chapters[c.id]);
+export const chRec = (c) => pick({ status: CH_ST[c.status] || 'pending', rev1: c.rev1 === '✓', rev2: c.rev2 === '✓', questions: c.questions || null, notes: c.notes || '', movedTo: null }, S.chapters[c.id]);
+// a chapter's day: the catch-up replanner's date (movedTo) when it has one, otherwise the plan's
+export const plannedOf = (c) => (S.chapters[c.id] && S.chapters[c.id].movedTo) || c.planned;
 export const mockRec = (m) => pick({ marks: nv(m.marks), time: nv(m.time), mistakes: m.mistakes || '', attempted: nv(m.attempted), pres: nv(m.pres), pph: nv(m.pph), illeg: nv(m.illeg), markedBy: m.markedBy || null, photos: null, movedTo: null, skipped: null }, S.mocks[m.id]);
 export const runRec = (r) => pick({ km: nv(r.km), min: nv(r.min), sec: nv(r.sec), effort: nv(r.effort), notes: r.notes || '', walked: r.walked || null, doneOn: r.doneOn || null }, S.runs[r.date]);
 
@@ -189,7 +191,7 @@ export function setRec(sec, id, field, value) {
       if (was !== day) { rec.autoTick = day; rec._f = stampFields(rec._f, ['autoTick'], Date.now()); S.runs[id] = rec; touch(sec, String(id), rec, true); }
     }
     // finishing every chapter planned for a day marks that day Done (it feeds the streak, like the original rule)
-    if (sec === 'chapters' && field === 'status' && CH_BY[id]) syncDayStatus(CH_BY[id].planned);
+    if (sec === 'chapters' && field === 'status' && CH_BY[id]) syncDayStatus(plannedOf(CH_BY[id]));
   });
   return rec;
 }
@@ -199,7 +201,7 @@ export function setRecFields(sec, id, fields) { let r = null; batch(() => { Obje
 export function planItemsDone(date) {
   const p = D.days[DAY_IDX[date]];
   if (!p) return null;
-  const chs = D.chapters.filter((c) => c.planned === date);
+  const chs = D.chapters.filter((c) => plannedOf(c) === date);
   if (chs.length) return chs.map((c) => chRec(c).status === 'done');
   const boss = !!(p.mock && p.mock !== '—');
   if (boss) return null;

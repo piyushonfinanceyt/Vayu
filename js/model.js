@@ -111,11 +111,14 @@ function computeGame(st, t) {
     if (r.rev1) cx += xp.revision;
     if (r.rev2) cx += xp.revision;
     if (r.questions === 'Yes') cx += xp.questions; else if (r.questions === 'Partly') cx += xp.questions / 2;
+    // planned = the day it's scheduled now (a catch-up replan's date, if any); planDate = the original plan's day
+    const planned = r.movedTo || c.planned;
     let flag = '';
-    if (done) flag = 'done'; else if (c.planned < t) flag = 'overdue'; else if (c.planned === t) flag = 'today'; else if (diff(t, c.planned) <= 2) flag = 'soon';
+    if (done) flag = 'done'; else if (planned < t) flag = 'overdue'; else if (planned === t) flag = 'today'; else if (diff(t, planned) <= 2) flag = 'soon';
     return Object.assign({}, c, r, {
+      planned, planDate: c.planned, moved: !!r.movedTo && r.movedTo !== c.planned,
       xp: cx, flag,
-      doneAt: done ? (ov.doneAt || (c.planned <= t ? c.planned : t)) : null,
+      doneAt: done ? (ov.doneAt || (planned <= t ? planned : t)) : null,
       rev1At: r.rev1 ? (ov.rev1At || t) : null,
       rev2At: r.rev2 ? (ov.rev2At || t) : null
     });
@@ -207,7 +210,7 @@ function computeGame(st, t) {
   const augLogged = D.aug.filter((a) => a.actual != null);
   const avgAug = augLogged.length ? sum(augLogged, (a) => a.actual) / augLogged.length : 0;
   const stepDays = days.filter((d) => (+d.rec.steps || 0) > 0);
-  const behind = chapters.filter((c) => c.planned < t).length - done;
+  const behind = chapters.filter((c) => c.planDate < t).length - done;   // against the original plan, even after a replan
 
   const worlds = WORLDS.map((w) => {
     const ch = chapters.filter((c) => c.subject === w.key);
@@ -645,7 +648,7 @@ function computeAll() {
 
   // ---------- notifications ----------
   const notes = [];
-  if (M.overdueCount) notes.push({ id: 'overdue', icon: 'alert', tone: 'warn', title: plural(M.overdueCount, 'chapter') + ' overdue', body: 'Planned before today and not marked done', href: '#/subjects?flag=overdue' });
+  if (M.overdueCount) notes.push({ id: 'overdue', icon: 'alert', tone: 'warn', title: plural(M.overdueCount, 'chapter') + ' overdue', body: 'Catch up: spread them over the days left', href: '#/study-plan' });
   const mkToday = mocks.find((x) => x.date === t && x.marks == null && x.status !== 'skipped');
   if (mkToday) notes.push({ id: 'mock', icon: 'mocks', tone: 'info', title: 'Full paper today · ' + mkToday.subject, body: mkToday.duration + ' · enter the marks afterwards', href: '#/mocks?id=' + mkToday.id });
   const missedP = mocks.filter((m) => m.status === 'missed');
