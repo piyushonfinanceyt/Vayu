@@ -193,7 +193,7 @@ export default {
       eyebrow: raw(esc(fmtLong(M.t)) + (M.journey.num ? ' · Day ' + M.journey.num + ' of ' + M.journey.days : '')),
       title: esc(greeting(h) + ', ' + name),
       sub: raw(esc(M.act) + ' · <span class="quote">“' + esc(M.quote) + '”</span>'),
-      actions: raw('<a class="btn" href="#/study-plan">' + icon('calcheck') + 'Today’s plan</a><button type="button" class="btn primary" data-act="quicklog">' + icon('logbook') + '10 PM log</button>')
+      actions: raw('<a class="btn" href="#/study-plan">' + icon('calcheck') + 'Today’s plan</a><button type="button" class="btn" data-act="focus">' + icon('target') + 'Deep focus</button><button type="button" class="btn primary" data-act="quicklog">' + icon('logbook') + '10 PM log</button>')
     };
   },
   render(M) {

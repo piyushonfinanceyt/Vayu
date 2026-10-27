@@ -15,12 +15,14 @@ import { open as openQuickLog } from './quicklog.js';
 import * as timer from './timer.js';
 import * as pwa from './pwa.js';
 import * as sync from './sync.js';
+import * as focus from './focus.js';
 import * as widgets from './widgets.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
 const commands = () => [
   { label: 'Fill in tonight’s 10 PM log', hint: 'Quick log · L', icon: 'logbook', fn: () => openQuickLog() },
+  { label: 'Start deep focus', hint: 'Full screen · one paper, one chapter or general study', icon: 'target', fn: () => focus.openSetup() },
   { label: 'Start the focus timer', hint: 'Pomodoro, Deep Work or a short break', icon: 'timer', fn: () => timer.open() },
   { label: 'Enter mock marks', hint: 'Mock Tests', icon: 'mocks', fn: () => go('#/mocks') },
   { label: 'Open today in the Study Plan', hint: 'Mission briefing', icon: 'calcheck', fn: () => go('#/study-plan') },
@@ -30,7 +32,8 @@ const commands = () => [
 export const GLOBAL = {
   palette: () => openPalette(commands()),
   quicklog: (el) => openQuickLog(el && el.dataset && isDate(el.dataset.date) ? el.dataset.date : undefined),
-  timer: () => timer.open(),
+  timer: () => (focus.active() ? focus.enter() : timer.open()),
+  focus: (el) => focus.openSetup(el && el.dataset && el.dataset.subject ? { kind: 'subject', subject: el.dataset.subject, chapterId: el.dataset.chapter || '' } : undefined),
   theme: toggleTheme,
   more: (el) => moreMenu(el),
   'more-sheet': () => moreSheet({ palette: GLOBAL.palette, timer: GLOBAL.timer, theme: toggleTheme }),
@@ -151,7 +154,7 @@ const celebrate = debounce(() => {
 
 // ---------- links that run an action: #/dashboard?do=timer (app shortcut, Windows widget) ----------
 function deepAction() {
-  const m = /[?&]do=(timer|quicklog)\b/.exec(location.hash);
+  const m = /[?&]do=(timer|quicklog|focus)\b/.exec(location.hash);
   if (!m) return;
   history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/([?&])do=\w+&?/, '$1').replace(/[?&]$/, ''));
   GLOBAL[m[1]]();
@@ -169,6 +172,7 @@ async function boot() {
   if (!location.hash) history.replaceState(null, '', location.pathname + location.search + '#/dashboard');
   await onRoute();
   deepAction();
+  focus.resume();   // a deep focus session survives a reload
   celebrate();
   document.body.classList.add('ready');
   if (kind === 'memory') { $('#banner').innerHTML = '<div class="banner" role="alert">This browser is blocking storage, so changes won’t survive a reload. Download a backup from Tools before closing.</div>'; }

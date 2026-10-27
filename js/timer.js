@@ -22,18 +22,41 @@ function beep() {
 export function start() { const s = state(); store.setTimerState(Object.assign({}, s, { endsAt: Date.now() + remaining() * 1000, startedAt: s.startedAt || new Date().toISOString(), remaining: null })); }
 export function pause() { const s = state(); store.setTimerState(Object.assign({}, s, { remaining: remaining(), endsAt: null })); }
 export function reset(mode) { const m = mode || state().mode; store.setTimerState({ mode: m, dur: durOf(m), endsAt: null, remaining: null, startedAt: null }); }
+// deep focus (focus.js): a full-screen session on one subject (and maybe one chapter) or general study
+export function startFocus(minutes, focus) {
+  const dur = Math.round(minutes * 60);
+  store.setTimerState({ mode: 'deep', dur, endsAt: Date.now() + dur * 1000, remaining: null, startedAt: new Date().toISOString(), deep: true, focus: focus || { kind: 'general' }, distractions: 0 });
+}
+export function distracted() { const s = state(); store.setTimerState(Object.assign({}, s, { distractions: (+s.distractions || 0) + 1 })); }
+let onDeepDone = null;
+export const onFocusComplete = (fn) => { onDeepDone = fn; };
+// saves a focus session for `mins` minutes (with what it was on) and credits the day's study hours
+function save(s, mins) {
+  const date = todayStr(), f = s.focus || {};
+  const rec = { date, mode: s.mode, minutes: mins, credited: mins, startedAt: s.startedAt, endedAt: new Date().toISOString() };
+  if (s.deep) Object.assign(rec, { deep: true, subject: f.subject || '', chapterId: f.chapterId || null, intention: f.intention || '', distractions: +s.distractions || 0, planned: Math.round(s.dur / 60) });
+  store.add('sessions', rec, 'fs');
+  store.addStudyMinutes(date, mins);
+  return rec;
+}
 function complete() {
   const s = state(), mins = Math.round(s.dur / 60);
+  let rec = null;
   store.batch(() => {
-    if (MODES[s.mode].focus) {
-      const date = todayStr();
-      store.add('sessions', { date, mode: s.mode, minutes: mins, credited: mins, startedAt: s.startedAt, endedAt: new Date().toISOString() }, 'fs');
-      store.addStudyMinutes(date, mins);
-    }
+    if (MODES[s.mode].focus) rec = save(s, mins);
     reset(MODES[s.mode].focus ? 'short' : 'pomodoro');
   });
   beep();
+  if (s.deep && onDeepDone) { onDeepDone(rec, s, true); return; }
   toast(MODES[s.mode].focus ? plural(mins, 'minute') + ' added to today’s study hours' : 'Break over. Back to it.', { icon: 'timer', ms: 5000 });
+}
+// stop a deep focus session early: the minutes actually spent still count (a minute or more)
+export function endEarly() {
+  const s = state(), mins = Math.floor((s.dur - remaining()) / 60);
+  let rec = null;
+  store.batch(() => { if (mins >= 1) rec = save(s, mins); reset('pomodoro'); });
+  if (s.deep && onDeepDone) onDeepDone(rec, s, false);
+  return mins;
 }
 export function tick() {
   if (running() && remaining() <= 0) complete();
@@ -62,12 +85,14 @@ export function open() {
       '<div style="position:relative;width:220px;height:220px"><svg viewBox="0 0 220 220" width="220" height="220" aria-hidden="true"><circle cx="110" cy="110" r="96" fill="none" stroke="var(--track)" stroke-width="10"/><circle data-timer-ring data-c="' + C.toFixed(2) + '" cx="110" cy="110" r="96" fill="none" stroke="var(--ink)" stroke-width="10" stroke-linecap="round" stroke-dasharray="' + C.toFixed(2) + '" stroke-dashoffset="' + (C * (1 - r / s.dur)).toFixed(2) + '" transform="rotate(-90 110 110)"/></svg>' +
       '<div style="position:absolute;inset:0;display:grid;place-items:center;text-align:center"><div><div data-timer-text role="timer" aria-live="off" style="font-size:46px;font-weight:500;letter-spacing:-.03em">' + mmss(r) + '</div><div class="lbl">' + esc(MODES[s.mode].label) + (MODES[s.mode].focus ? ' · counts as study' : '') + '</div></div></div></div>' +
       '<div class="row"><button type="button" class="btn primary" data-tm="toggle" style="min-width:120px">' + icon(running() ? 'pause' : 'play') + (running() ? 'Pause' : remaining() < s.dur ? 'Resume' : 'Start') + '</button><button type="button" class="btn" data-tm="reset">' + icon('reset') + 'Reset</button></div>' +
+      '<button type="button" class="btn ghost" data-tm="deep">' + icon('target') + 'Deep focus on a subject…</button>' +
       '<p class="hint" style="text-align:center">Finished focus sessions are added to today’s hours in the 10 PM log. Lengths are in Settings.</p></div>';
   };
   const m = modal({ title: 'Focus timer', body: raw(body()) });
   const redraw = () => { m.el.querySelector('.modal-body').innerHTML = body(); };
   m.el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-tm], [data-tm-mode]'); if (!b) return;
+    if (b.dataset.tm === 'deep') { m.close(); document.dispatchEvent(new CustomEvent('vayu:focus')); return; }
     if (b.dataset.tmMode) reset(b.dataset.tmMode);
     else if (b.dataset.tm === 'toggle') { if (running()) pause(); else start(); }
     else reset();
