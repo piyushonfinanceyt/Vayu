@@ -18,7 +18,38 @@
   ],
   "shortcuts": [
     { "name": "10 PM log", "short_name": "Log", "url": "./#/log", "icons": [{ "src": "icons/shortcut-log.png", "sizes": "96x96", "type": "image/png" }] },
+    { "name": "Focus timer", "short_name": "Timer", "url": "./#/dashboard?do=timer", "icons": [{ "src": "icons/shortcut-log.png", "sizes": "96x96", "type": "image/png" }] },
     { "name": "Study Plan", "short_name": "Plan", "url": "./#/study-plan", "icons": [{ "src": "icons/shortcut-log.png", "sizes": "96x96", "type": "image/png" }] },
     { "name": "Mock Tests", "short_name": "Mocks", "url": "./#/mocks", "icons": [{ "src": "icons/shortcut-log.png", "sizes": "96x96", "type": "image/png" }] }
+  ],
+  "widgets": [
+    {
+      "name": "Vayu · Today",
+      "short_name": "Today",
+      "description": "Days to Paper 1, today's plan day, study hours against target, the 10 PM log and your no-zero streak.",
+      "tag": "vayu-today",
+      "template": "vayu-today",
+      "ms_ac_template": "widgets/today.json",
+      "data": "widgets/today-data.json",
+      "type": "application/json",
+      "screenshots": [{ "src": "widgets/today-preview.png", "sizes": "300x304", "label": "The Vayu Today widget" }],
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }],
+      "auth": false,
+      "update": 3600
+    },
+    {
+      "name": "Vayu · Countdown",
+      "short_name": "Countdown",
+      "description": "The countdown to Paper 1 and where you are in the journey.",
+      "tag": "vayu-countdown",
+      "template": "vayu-countdown",
+      "ms_ac_template": "widgets/countdown.json",
+      "data": "widgets/countdown-data.json",
+      "type": "application/json",
+      "screenshots": [{ "src": "widgets/countdown-preview.png", "sizes": "300x304", "label": "The Vayu countdown widget" }],
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }],
+      "auth": false,
+      "update": 3600
+    }
   ]
 }

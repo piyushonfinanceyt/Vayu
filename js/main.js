@@ -14,6 +14,7 @@ import { open as openQuickLog } from './quicklog.js';
 import * as timer from './timer.js';
 import * as pwa from './pwa.js';
 import * as sync from './sync.js';
+import * as widgets from './widgets.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
@@ -145,6 +146,14 @@ const celebrate = debounce(() => {
   last = { xp: M.xp, level: M.level, badges: M.badges.map((b) => b.on) };
 }, 650);
 
+// ---------- links that run an action: #/dashboard?do=timer (app shortcut, Windows widget) ----------
+function deepAction() {
+  const m = /[?&]do=(timer|quicklog)\b/.exec(location.hash);
+  if (!m) return;
+  history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/([?&])do=\w+&?/, '$1').replace(/[?&]$/, ''));
+  GLOBAL[m[1]]();
+}
+
 // ---------- boot ----------
 async function boot() {
   applyTheme();
@@ -152,10 +161,11 @@ async function boot() {
   let kind;
   try { kind = await store.init(); }
   catch (e) { console.error(e); $('#main').innerHTML = '<div class="banner">' + esc('Couldn’t open your data: ' + e.message) + '</div>'; return; }
-  store.subscribe((info) => { if (info && info.coll === '*') quiet = true; renderSoon(); celebrate(); });
-  window.addEventListener('hashchange', onRoute);
+  store.subscribe((info) => { if (info && info.coll === '*') quiet = true; renderSoon(); celebrate(); widgets.refresh(); });
+  window.addEventListener('hashchange', () => onRoute().then(deepAction));
   if (!location.hash) history.replaceState(null, '', location.pathname + location.search + '#/dashboard');
   await onRoute();
+  deepAction();
   celebrate();
   document.body.classList.add('ready');
   if (kind === 'memory') { $('#banner').innerHTML = '<div class="banner" role="alert">This browser is blocking storage, so changes won’t survive a reload. Download a backup from Tools before closing.</div>'; }
@@ -168,7 +178,9 @@ async function boot() {
   // sync between devices (Settings → Sync between devices); does nothing until you connect it
   sync.onChange(() => renderSoon());
   sync.start();
-  const remind = () => pwa.checkReminder(() => openQuickLog()).catch((e) => console.warn('[reminder]', e));
+  // the Windows widgets' snapshot and the app-icon badge
+  widgets.refresh();
+  const remind = () => { widgets.refresh(); pwa.checkReminder(() => openQuickLog()).catch((e) => console.warn('[reminder]', e)); };
   let day = todayStr();
   setInterval(() => { if (todayStr() !== day) { day = todayStr(); render('update'); } remind(); }, 30000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (todayStr() !== day) { day = todayStr(); render('update'); } remind(); } });

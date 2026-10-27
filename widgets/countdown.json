@@ -1,0 +1,14 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "selectAction": { "type": "Action.Execute", "verb": "open", "title": "Open Vayu" },
+  "body": [
+    { "type": "TextBlock", "text": "PAPER 1 · ACCOUNTS", "size": "Small", "weight": "Bolder", "isSubtle": true },
+    { "type": "TextBlock", "text": "${days}", "size": "ExtraLarge", "weight": "Bolder", "spacing": "Small", "$when": "${ready}" },
+    { "type": "TextBlock", "text": "${daysWord} to go", "weight": "Bolder", "spacing": "None", "$when": "${ready}" },
+    { "type": "TextBlock", "text": "${when}", "isSubtle": true, "spacing": "Medium", "wrap": true, "$when": "${ready}" },
+    { "type": "TextBlock", "text": "${dayLine}", "isSubtle": true, "size": "Small", "spacing": "None", "wrap": true, "$when": "${ready}" },
+    { "type": "TextBlock", "text": "Open Vayu once on this computer to start the countdown.", "wrap": true, "isSubtle": true, "$when": "${!ready}" }
+  ]
+}

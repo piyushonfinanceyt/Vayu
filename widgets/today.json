@@ -1,0 +1,49 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "selectAction": { "type": "Action.Execute", "verb": "open", "title": "Open Vayu" },
+  "body": [
+    {
+      "type": "Container",
+      "$when": "${!ready}",
+      "items": [
+        { "type": "TextBlock", "text": "Vayu", "weight": "Bolder", "size": "Large" },
+        { "type": "TextBlock", "text": "Open Vayu once on this computer to fill this widget.", "wrap": true, "isSubtle": true }
+      ]
+    },
+    {
+      "type": "Container",
+      "$when": "${ready}",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "columns": [
+            { "type": "Column", "width": "auto", "items": [{ "type": "TextBlock", "text": "${days}", "size": "ExtraLarge", "weight": "Bolder" }] },
+            {
+              "type": "Column", "width": "stretch", "verticalContentAlignment": "Center",
+              "items": [
+                { "type": "TextBlock", "text": "days to Paper 1", "weight": "Bolder", "spacing": "None" },
+                { "type": "TextBlock", "text": "${dayLine}", "isSubtle": true, "size": "Small", "spacing": "None", "wrap": true }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "FactSet",
+          "spacing": "Medium",
+          "facts": [
+            { "title": "Study", "value": "${study}" },
+            { "title": "Plan", "value": "${plan}" },
+            { "title": "Log", "value": "${log}" },
+            { "title": "Streak", "value": "${streak}" }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    { "type": "Action.Execute", "title": "10 PM log", "verb": "log" },
+    { "type": "Action.Execute", "title": "Focus timer", "verb": "timer" }
+  ]
+}
