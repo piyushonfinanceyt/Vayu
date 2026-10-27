@@ -10,8 +10,10 @@ import { numField, textField, bind } from './parts.js';
 import { isOpen } from '../prefs.js';
 import { paperMultiples, passOutlook } from './insights.js';
 import * as store from '../store.js';
+import { openMarking, pasteMarking, decodeLink } from '../marking.js';
+import { model as modelOf } from '../model.js';
 
-let focusId = null;
+let focusId = null, markingIn = null;
 const P = (n) => Math.round(n * 100);
 
 function fixItDayFor(M, f) {
@@ -123,17 +125,25 @@ function shrink(file) {
 }
 
 export default {
-  enter(q) { focusId = q.id ? +q.id : null; },
+  enter(q) { focusId = q.id ? +q.id : null; markingIn = q.marking || null; },
   head(M) {
     const mk = M.mocks.find((x) => x.date === M.t && x.status !== 'skipped');
-    return { title: 'Mock Tests', actions: mk ? raw('<a class="btn primary" href="#/mocks?id=' + mk.id + '">' + icon('edit') + 'Today · mock #' + mk.id + ' ' + esc(mk.subject) + '</a>') : '' };
+    return { title: 'Mock Tests', actions: raw('<button type="button" class="btn" data-act="mk-paste" title="Add a paper Claude marked: copy its “Vayu marking” block first">' + icon('copy') + 'Paste marking</button>' + (mk ? '<a class="btn primary" href="#/mocks?id=' + mk.id + '">' + icon('edit') + 'Today · mock #' + mk.id + ' ' + esc(mk.subject) + '</a>' : '')) };
   },
   render(M) { return html`${stats(M)}${passOutlook(M, { cls: 'ol-card' })}${paperMultiples(M)}<div class="grid">${scorecard(M)}${roster(M)}</div>${series(M)}`; },
   after(root) {
     paintPhotos(root);
+    if (markingIn) {
+      // a link from Claude's marking report: show what it adds, and drop it from the address so a reload doesn't repeat it
+      const o = decodeLink(markingIn);
+      markingIn = null;
+      history.replaceState(null, '', location.pathname + location.search + '#/mocks');
+      setTimeout(() => openMarking(modelOf(), o ? JSON.stringify(o) : ''), 80);
+    }
     if (focusId) { const el = document.getElementById('mock-' + focusId); if (el) { setTimeout(() => el.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60); } focusId = null; }
   },
   actions: {
+    'mk-paste': () => pasteMarking(modelOf()),
     'mock-move': (el) => { const M = modelNow(), f = M.mocks.find((x) => x.id === +el.dataset.id); if (!f) return; const d = fixItDayFor(M, f); if (!d) { toast('All five fix-it days already hold a paper. Write this one on the next Sunday instead.', { tone: 'warn', ms: 6000 }); return; } store.setRecFields('mocks', f.id, { movedTo: d, skipped: null }); toast('Mock #' + f.id + ' moved to ' + fmtDL(d) + ', 2–5 PM'); },
     'mock-unmove': (el) => store.setRec('mocks', +el.dataset.id, 'movedTo', null),
     'mock-skip': (el) => store.setRec('mocks', +el.dataset.id, 'skipped', 'Yes'),

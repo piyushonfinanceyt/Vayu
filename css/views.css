@@ -583,3 +583,17 @@
 .wr-also ul { margin-top: 6px; display: grid; gap: 6px; font-size: 13px; }
 .wr-also a { color: var(--ink-2); }
 @media (max-width: 700px) { .wr-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ================= Marking hand-off (Mock Tests) ================= */
+.mk-imp { display: grid; gap: 12px; }
+.mk-head { display: grid; gap: 2px; padding: 14px 16px; border-radius: var(--r-md); background: var(--soft); }
+.mk-head b { font-weight: 500; }
+.mk-head .big { font-size: 30px; font-weight: 500; letter-spacing: -.02em; }
+.mk-head .big small { font-size: 14px; color: var(--ink-3); font-weight: 400; }
+.mk-imp .sub-h { margin: 4px 0 0; }
+.mk-list { display: grid; gap: 0; max-height: 260px; overflow: auto; }
+.mk-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.mk-list b { font-weight: 500; } .mk-list .num { color: var(--bad); font-weight: 500; }
+.mk-list small { grid-column: 1 / -1; color: var(--ink-2); font-size: 12.5px; }
+.mk-fixes { list-style: decimal; padding-left: 1.2em; display: grid; gap: 4px; font-size: 13px; }
+.mk-imp p .ic, .mk-imp p > svg { width: 14px; height: 14px; vertical-align: -2px; }
