@@ -32,16 +32,16 @@ function badge(M) {
   (due ? navigator.setAppBadge() : navigator.clearAppBadge()).catch(() => {});
 }
 
-let lastJSON = '';
+// compared with what's in the cache, not our last write: the service worker may have put another device's summary there
+const sig = (s) => JSON.stringify(Object.assign({}, s, { at: 0 }));
 async function write() {
   const M = model();
   badge(M);
   if (!('caches' in window) || !pwa.swSupported()) return;
-  const s = snapshot(M), json = JSON.stringify(Object.assign({}, s, { at: 0 }));
-  if (json === lastJSON) return;
-  lastJSON = json;
+  const s = snapshot(M);
   try {
-    const cache = await caches.open(WIDGET_CACHE);
+    const cache = await caches.open(WIDGET_CACHE), old = await cache.match(SNAPSHOT_URL);
+    if (old && sig(await old.json()) === sig(s)) return;
     await cache.put(SNAPSHOT_URL, new Response(JSON.stringify(s), { headers: { 'Content-Type': 'application/json' } }));
     const reg = await navigator.serviceWorker.getRegistration();
     if (reg && reg.active) reg.active.postMessage({ type: 'widgets' });

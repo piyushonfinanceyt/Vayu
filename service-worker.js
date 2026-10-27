@@ -7,9 +7,10 @@
    - Tapping the 10 PM reminder notification opens the Daily Log.
    - Windows 11 widgets (manifest "widgets"): drawn from the snapshot the page keeps in the 'fc-widget' cache (js/widgets.js),
      redrawn when the page sends 'widgets', on install/resume/activate and by periodic sync, so the countdown and today's
-     plan stay right after midnight while the app is closed.
+     plan stay right after midnight while the app is closed. With sync on, install/resume/activate/periodic sync first
+     fetch the summary your other devices upload (vayu-widget.json), so the widgets follow what you log elsewhere.
    Bump VERSION when you deploy so installed copies pick up the new files. Your data (IndexedDB) is never touched. */
-const VERSION = 'fc-2026-10-27-1';
+const VERSION = 'fc-2026-10-27-2';
 const FONTS = 'fc-fonts';
 const WIDGET = 'fc-widget';
 const SHELL = [
@@ -38,7 +39,7 @@ self.addEventListener('activate', (event) => {
     const keys = await caches.keys();
     await Promise.all(keys.filter((k) => k.startsWith('fc-') && k !== VERSION && k !== FONTS && k !== WIDGET).map((k) => caches.delete(k)));
     await self.clients.claim();
-    await updateWidgets();
+    await updateWidgets(true);
   })());
 });
 
@@ -106,6 +107,41 @@ const plural = (n, one) => n + ' ' + (n === 1 ? one : one + 's');
 async function readSnapshot() {
   try { const res = await (await caches.open(WIDGET)).match('./widgets/snapshot.json'); return res ? await res.json() : null; } catch (e) { return null; }
 }
+const writeSnapshot = async (s) => (await caches.open(WIDGET)).put('./widgets/snapshot.json', new Response(JSON.stringify(s), { headers: { 'Content-Type': 'application/json' } }));
+
+// While this copy is closed: fetch the summary your other devices upload with each sync (vayu-widget.json in the sync
+// gist, js/sync.js), decrypt it with the key the app left in IndexedDB 'vayu-worker', and keep it if it's newer than ours.
+function syncDetails() {
+  return new Promise((resolve) => {
+    const r = indexedDB.open('vayu-worker', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onerror = () => resolve(null);
+    r.onsuccess = () => {
+      const db = r.result, q = db.transaction('kv').objectStore('kv').get('sync');
+      q.onsuccess = () => { db.close(); resolve(q.result || null); };
+      q.onerror = () => { db.close(); resolve(null); };
+    };
+  });
+}
+const fromB64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+let lastPull = 0;
+async function pullSnapshot() {
+  if (Date.now() - lastPull < 60000) return;
+  lastPull = Date.now();
+  const c = await syncDetails();
+  if (!c || !c.token || !c.gistId || !c.key) return;
+  try {
+    const res = await fetch('https://api.github.com/gists/' + c.gistId, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + c.token } });
+    if (!res.ok) return;
+    const f = ((await res.json()).files || {})['vayu-widget.json'];
+    if (!f) return;
+    const env = JSON.parse(f.truncated ? await (await fetch(f.raw_url, { cache: 'no-store' })).text() : f.content);
+    if (!env || env.app !== 'vayu-widget') return;
+    const s = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: fromB64(env.iv) }, c.key, fromB64(env.data))));
+    const mine = await readSnapshot();
+    if (s && s.exam && s.days && (!mine || (+s.at || 0) > (+mine.at || 0))) await writeSnapshot(s);
+  } catch (e) { console.warn('[widgets] background refresh:', e && e.message); }
+}
 // what both cards share: whole days left on the clock (69 days 23 h reads as 69, like the in-app countdown) and today's plan day
 function base(s) {
   if (!s || !s.exam) return { ready: false };
@@ -134,10 +170,13 @@ async function renderWidget(widget) {
   const template = await (await caches.match(def.msAcTemplate, { ignoreSearch: true }) || await fetch(def.msAcTemplate)).text();
   await self.widgets.updateByTag(def.tag, { template, data: JSON.stringify(data(await readSnapshot())) });
 }
-async function updateWidgets() {
+// pull: also fetch your other devices' latest summary first (not when this copy's own page just sent fresh data)
+async function updateWidgets(pull) {
   if (!self.widgets) return;
   try {
     const list = await self.widgets.matchAll({ installed: true });
+    if (!list.length) return;
+    if (pull) await pullSnapshot();
     await Promise.all(list.map((w) => renderWidget(w).catch((e) => console.warn('[widgets]', e && e.message))));
   } catch (e) { console.warn('[widgets]', e && e.message); }
 }
@@ -147,10 +186,12 @@ async function onWidgetInstall(widget) {
     const ps = self.registration.periodicSync;
     if (ps && def.update && !(await ps.getTags()).includes(def.tag)) await ps.register(def.tag, { minInterval: def.update * 1000 });
   } catch (e) { /* periodic sync not allowed: the widget still updates whenever Vayu is open */ }
+  await pullSnapshot();
   await renderWidget(widget);
 }
 self.addEventListener('widgetinstall', (event) => { event.waitUntil(onWidgetInstall(event.widget)); });
-self.addEventListener('widgetresume', (event) => { event.waitUntil(renderWidget(event.widget)); });
+// the board resumes widgets when you open it after a while: a good moment to fetch what you logged elsewhere
+self.addEventListener('widgetresume', (event) => { event.waitUntil(pullSnapshot().then(() => renderWidget(event.widget))); });
 self.addEventListener('widgetuninstall', (event) => {
   event.waitUntil((async () => {
     const w = event.widget, ps = self.registration.periodicSync;
@@ -161,4 +202,4 @@ self.addEventListener('widgetclick', (event) => {
   const to = { log: './#/log', timer: './#/dashboard?do=timer' }[event.action] || './#/dashboard';
   event.waitUntil(openApp(to));
 });
-self.addEventListener('periodicsync', (event) => { if (self.widgets) event.waitUntil(updateWidgets()); });
+self.addEventListener('periodicsync', (event) => { if (self.widgets) event.waitUntil(updateWidgets(true)); });

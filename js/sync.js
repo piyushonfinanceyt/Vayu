@@ -8,12 +8,18 @@
    - It runs when the app opens or comes back on screen, a few seconds after you change something, when you leave the
      app, every 3 minutes while it's open, and when the connection returns.
    - A replace (import, restore point, reset) carries an epoch: devices that see a newer epoch drop what they had from
-     before it, so the replace reaches them too. The first sync of a device always merges and never replaces. */
+     before it, so the replace reaches them too. The first sync of a device always merges and never replaces.
+   - A second file, vayu-widget.json, holds the Windows widgets' summary of today and the next 6 days (widgets.js),
+     encrypted with the same key and uploaded only when it changed. The service worker of a copy with widgets on the
+     board reads it while that copy is closed, so the widgets follow what you log on your other devices. For that the
+     worker gets this device's token, gist id and key (as a CryptoKey it can't export) in its own IndexedDB. */
 import * as store from './store.js';
 import { toast } from './components.js';
 import { plural } from './util.js';
+import { model } from './model.js';
+import { snapshot as widgetSnapshot } from './widgets.js';
 
-const KEY = 'fc.sync', FILE = 'vayu-sync.json', API = 'https://api.github.com', ITER = 250000;
+const KEY = 'fc.sync', FILE = 'vayu-sync.json', WFILE = 'vayu-widget.json', API = 'https://api.github.com', ITER = 250000;
 export const TOKEN_URL = 'https://github.com/settings/tokens/new?scopes=gist&description=Vayu%20sync';
 
 let cfg = load();
@@ -71,10 +77,37 @@ async function deriveKey(pass, salt) {
   return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: ITER, hash: 'SHA-256' }, base, 256));
 }
 const aes = (raw) => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
-async function seal(obj, raw, salt) {
+async function encrypt(obj, raw) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aes(raw), te.encode(JSON.stringify(obj))));
-  return JSON.stringify({ app: 'vayu-sync', v: 1, note: 'Your Vayu data, encrypted with your sync passphrase. Change it only from the app.', savedAt: new Date().toISOString(), kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITER, salt: toB64(salt) }, cipher: 'AES-GCM', iv: toB64(iv), data: toB64(ct) }, null, 1);
+  return { cipher: 'AES-GCM', iv: toB64(iv), data: toB64(ct) };
+}
+async function seal(obj, raw, salt) {
+  return JSON.stringify(Object.assign({ app: 'vayu-sync', v: 1, note: 'Your Vayu data, encrypted with your sync passphrase. Change it only from the app.', savedAt: new Date().toISOString(), kdf: { name: 'PBKDF2', hash: 'SHA-256', iterations: ITER, salt: toB64(salt) } }, await encrypt(obj, raw)), null, 1);
+}
+const sealWidget = async (snap, raw) => JSON.stringify(Object.assign({ app: 'vayu-widget', v: 1, note: 'The summary your Windows widgets show, encrypted with your sync passphrase.', savedAt: new Date().toISOString() }, await encrypt(snap, raw)), null, 1);
+
+// ---------- the service worker's copy of the sync details (widget refresh while the app is closed) ----------
+function workerStore(fn) {
+  return new Promise((resolve, reject) => {
+    const r = indexedDB.open('vayu-worker', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => {
+      const db = r.result, tx = db.transaction('kv', 'readwrite');
+      fn(tx.objectStore('kv'));
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    };
+  });
+}
+let shared = '';
+async function shareWithWorker() {
+  const sig = cfg.gistId + '|' + cfg.salt + '|' + cfg.token;
+  if (shared === sig || !('indexedDB' in window)) return;
+  const key = await crypto.subtle.importKey('raw', fromB64(cfg.key), 'AES-GCM', false, ['decrypt']);
+  await workerStore((kv) => kv.put({ token: cfg.token, gistId: cfg.gistId, key }, 'sync'));
+  shared = sig;
 }
 async function unseal(env, raw) {
   let o;
@@ -112,6 +145,8 @@ export async function connect(token, pass, replace) {
 export function disconnect() {
   clearTimeout(timer);
   cfg = {}; save();
+  shared = '';
+  workerStore((kv) => kv.delete('sync')).catch(() => {});
   Object.assign(state, { busy: false, error: null, kind: null, lastAt: null });
   changed();
 }
@@ -149,14 +184,18 @@ export function syncNow(reason) {
       const merged = theirs ? store.mergeWith(mine, theirs, cutA, cutB) : mine;
       const pulled = theirs ? store.applyData(merged, epoch, 'sync') : 0;
       const push = !theirs || epoch !== eTheirs || store.countChanges(merged, theirs) > 0;
-      if (push) {
-        const content = await seal(store.exportObject(), raw, fromB64(cfg.salt));
-        const files = { [FILE]: { content } };
+      // the widgets' summary of the merged data: sent when it changed (an edit, a new day), the "at" stamp aside
+      const snap = widgetSnapshot(model()), snapSig = JSON.stringify(Object.assign({}, snap, { at: 0 }));
+      const files = {};
+      if (push) files[FILE] = { content: await seal(store.exportObject(), raw, fromB64(cfg.salt)) };
+      if (push || snapSig !== cfg.widgetSent || !(gist && gist.files && gist.files[WFILE])) files[WFILE] = { content: await sealWidget(snap, raw) };
+      if (Object.keys(files).length) {
         gist = gist ? await gh('/gists/' + gist.id, { method: 'PATCH', body: { files }, write: true })
           : await gh('/gists', { method: 'POST', body: { public: false, description: 'Vayu sync · encrypted, change it only from the app', files }, write: true });
       }
-      Object.assign(cfg, { gistId: gist.id, synced: gist.id, lastAt: new Date().toISOString(), fresh: false });
+      Object.assign(cfg, { gistId: gist.id, synced: gist.id, lastAt: new Date().toISOString(), fresh: false, widgetSent: snapSig });
       save();
+      shareWithWorker().catch((e) => console.warn('[sync] widget refresh not set up:', e && e.message));
       if (seq === startSeq) cleanSeq = seq;
       Object.assign(state, { error: null, kind: null, lastAt: cfg.lastAt });
       if (pulled && reason !== 'connect') toast('Synced · ' + plural(pulled, 'update') + ' from your other device', { icon: 'sync', ms: 2600 });
