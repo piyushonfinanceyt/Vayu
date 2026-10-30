@@ -23,7 +23,7 @@ function countdown(M) {
   const J = M.journey, st = M.st, syl = diff(M.t, st.syllabusDeadline), fin = diff(M.t, J.finish);
   const sylPos = clamp01(diff(J.start, st.syllabusDeadline) / J.days) * 100, finPos = clamp01(diff(J.start, J.finish) / J.days) * 100;
   const unit = (k, v, l) => html`<span class="cd-u"><b data-cd="${k}">${k === 'd' ? String(v) : String(v).padStart(2, '0')}</b><small>${l}</small></span>`;
-  return html`<section class="card hero cd-card span-4" aria-label="Countdown to Paper 1">
+  return html`<section class="card hero cd-card" aria-label="Countdown to Paper 1">
     <div class="between"><span class="lbl">${icon('cap')} Paper 1 · Accounts</span><span class="chip">${fmtD(st.examDate)} · ${fmtClock(at.getHours() * 60 + at.getMinutes())}</span></div>
     <div class="cd-big"><span class="value xl" data-count="${d}">${d}</span><span class="cd-days">days to go</span></div>
     <div class="cd" role="timer" aria-label="${d} days, ${h} hours and ${m} minutes to Paper 1" data-cd-at="${at.getTime()}">${unit('h', h, 'hrs')}${unit('m', m, 'min')}${unit('s', sec, 'sec')}</div>
@@ -208,8 +208,8 @@ export default {
     const B = blockState(M);
     const wk = promptWeek(M.t);
     const review = wk ? html`<section class="notice review-prompt" role="region" aria-label="Week in review">${icon('analytics')}<div class="grow"><p><b>Your week in review is ready</b> · ${fmtDS(wk)} – ${fmtDS(addDays(wk, 6))}</p><p class="muted">Hours, chapters, papers and mistakes against last week, with one focus for next week.</p></div><div class="row wrap"><button type="button" class="btn sm primary" data-act="review">Open the review</button><button type="button" class="btn sm ghost" data-act="review-later">Not now</button></div></section>` : '';
-    return html`${welcome(M)}${review}${whatNowCard(M)}
-      <div class="grid dash-r1">${countdown(M)}${timetableCard(M, B)}</div>
+    return html`${welcome(M)}${review}
+      <div class="grid dash-r1"><div class="dash-left span-4">${countdown(M)}${whatNowCard(M)}</div>${timetableCard(M, B)}</div>
       <div class="grid dash-r2"><div class="meters span-8">${targetMeters(M)}</div>${nextUp(M, B)}</div>
       <div class="grid dash-r3">${planCard(M)}${logCard(M)}${runCard(M)}</div>
       ${kpiRow(M)}

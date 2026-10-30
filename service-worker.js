@@ -10,7 +10,7 @@
      plan stay right after midnight while the app is closed. With sync on, install/resume/activate/periodic sync first
      fetch the summary your other devices upload (vayu-widget.json), so the widgets follow what you log elsewhere.
    Bump VERSION when you deploy so installed copies pick up the new files. Your data (IndexedDB) is never touched. */
-const VERSION = 'fc-2026-10-30-2';
+const VERSION = 'fc-2026-10-30-3';
 const FONTS = 'fc-fonts';
 const WIDGET = 'fc-widget';
 const SHELL = [
