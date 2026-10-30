@@ -34,7 +34,7 @@ export const onFocusComplete = (fn) => { onDeepDone = fn; };
 function save(s, mins) {
   const date = todayStr(), f = s.focus || {};
   const rec = { date, mode: s.mode, minutes: mins, credited: mins, startedAt: s.startedAt, endedAt: new Date().toISOString() };
-  if (s.deep) Object.assign(rec, { deep: true, subject: f.subject || '', chapterId: f.chapterId || null, intention: f.intention || '', distractions: +s.distractions || 0, planned: Math.round(s.dur / 60) });
+  if (s.deep) Object.assign(rec, { deep: true, subject: f.subject || '', chapterId: f.chapterId || null, round: f.round || '', intention: f.intention || '', distractions: +s.distractions || 0, planned: Math.round(s.dur / 60) });
   store.add('sessions', rec, 'fs');
   store.addStudyMinutes(date, mins);
   return rec;

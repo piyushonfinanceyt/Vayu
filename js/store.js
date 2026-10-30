@@ -9,7 +9,7 @@
      settings                        overrides on top of the plan settings (paths like phases.2.hrs)
      goals, tasks, schedule, habits, habitLogs, notes, milestones, lifeAreas, progress, sessions, resources, finance,
      arc, journal, logs, errors,     collections of records with id / createdAt / updatedAt
-     cards (flashcards)
+     cards (flashcards), tests (chapter tests)
    Every write bumps `version` and notifies subscribers; the model (model.js) is recomputed from it.
    For merging copies between devices (merge.js, sync.js): plan records stamp each written field in _f, deletions
    leave a tombstone in meta.tombs, and a replace (import, restore point, reset) sets meta.epoch. */
@@ -23,7 +23,7 @@ const D = window.__FC_DATA__;
 export { D };
 
 export const LEGACY = ['days', 'chapters', 'mocks', 'runs'];
-export const LISTS = ['goals', 'tasks', 'schedule', 'habits', 'habitLogs', 'notes', 'milestones', 'lifeAreas', 'progress', 'sessions', 'resources', 'finance', 'arc', 'journal', 'logs', 'errors', 'cards'];
+export const LISTS = ['goals', 'tasks', 'schedule', 'habits', 'habitLogs', 'notes', 'milestones', 'lifeAreas', 'progress', 'sessions', 'resources', 'finance', 'arc', 'journal', 'logs', 'errors', 'cards', 'tests'];
 export const COLLS = LEGACY.concat(LISTS);
 
 // the original tracker's starting log (your 25 Sep entries), used on a fresh device

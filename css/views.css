@@ -638,8 +638,21 @@ body.focus-on { overflow: hidden; }
 
 /* ================= What now? (Dashboard) ================= */
 /* always black: fixed colours, not theme tokens, so it looks the same in every theme and mode */
-.dash-left { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.dash-left .cd-card { flex: 1 1 auto; }
+.dash-r1 > .card { margin-top: 0; }
+.dash-r1 > .cd-card, .dash-r1 > .wn, .dash-r1 > .hours-card { grid-column: span 12; }
+@media (min-width: 1101px) {
+  .dash-r1 > .cd-card { grid-column: 1 / span 4; grid-row: 1; }
+  .dash-r1 > .tt-card { grid-column: 5 / span 8; grid-row: 1; }
+  .dash-r1 > .wn { grid-column: 1 / span 4; grid-row: 2; }
+  .dash-r1 > .hours-card { grid-column: 5 / span 8; grid-row: 2; }
+  .dash-r1:not(:has(.hours-card)) > .tt-card { grid-row: 1 / span 2; }
+}
+.hc-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.hc-nums > div { display: grid; gap: 1px; min-width: 0; }
+.hc-nums b { font-size: 26px; font-weight: 500; letter-spacing: -.02em; line-height: 1.2; }
+.hc-nums small { color: var(--ink-3); font-size: 12px; line-height: 1.35; }
+.hc-say { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-2); }
+.hours-card .btn { margin-top: 8px; }
 .wn { flex: none; display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "ic main" "go go" "alt alt"; gap: 10px 12px; align-items: center; padding: 14px 16px; border-radius: var(--r-card); background: #0b0b0a; color: #f4f3ee; border: 1px solid #33332f; }
 .wn-ic { grid-area: ic; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 12px; background: #262624; color: #f4f3ee; }
 .wn-ic svg { width: 20px; height: 20px; }

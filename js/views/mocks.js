@@ -4,7 +4,7 @@
    this device; a link to log the lost marks in the Error Book. */
 import { html, raw, esc, fmt1, fmtN, fmtD, fmtDS, fmtDL, plural, diff, pct, sortBy, uid, $, $$, isDate } from '../util.js';
 import { icon } from '../icons.js';
-import { card, chip, status, tile, empty, toast, confirm, modal } from '../components.js';
+import { card, chip, status, tile, empty, toast, confirm, modal, form } from '../components.js';
 import { spot, bullet } from '../charts.js';
 import { numField, textField, bind } from './parts.js';
 import { isOpen } from '../prefs.js';
@@ -53,6 +53,34 @@ function scorecard(M) {
       <h3 class="sub-h">Marks attempted per paper</h3>
       ${spot('writing', 'line', { height: 170, x: { type: 'date', from: M.mocks[0].date, to: M.mocks[M.mocks.length - 1].date }, y: { min: 0, max: 100, ticks: [0, 25, 50, 75, 100] }, fmtY: (v) => String(Math.round(v)), refs: [{ y: 85, label: '85 by 17 Nov', color: 'var(--ink-3)' }, { y: 100, label: 'whole paper', color: 'var(--good-mark)' }],
         series: [{ id: 'att', name: 'Attempted', color: 'var(--ink)', points: att.map((f) => ({ x: f.date, y: +f.attempted, note: 'P' + M.WMAP[f.subject].paper + ' ' + f.subject })) }], empty: { text: 'Enter “Attempted” after your first paper.' }, ariaLabel: 'Marks attempted in each full paper' })}`
+  });
+}
+// chapter tests: Claude's markings land here, or add your own; they feed the pass forecast but aren't full papers
+const TEST_PAPERS = (M) => M.worlds.map((w) => [w.key, w.code + ' ' + w.short]);
+function openTest(M, t) {
+  form({
+    title: t ? 'Edit chapter test' : 'Add a chapter test',
+    fields: [{ name: 'paper', label: 'Paper', type: 'select', options: TEST_PAPERS(M), half: true }, { name: 'date', label: 'Date', type: 'date', half: true, required: true }, { name: 'test', label: 'Test name', required: true, placeholder: 'Overheads test' }, { name: 'marks', label: 'Marks', type: 'number', min: 0, step: 0.5, half: true, required: true }, { name: 'max', label: 'Out of', type: 'number', min: 1, step: 1, half: true, required: true }],
+    values: t || { paper: M.outlook.papers[0].key, date: M.t, max: 30 },
+    submitLabel: t ? 'Save' : 'Add test',
+    onSubmit: (v) => {
+      if (v.marks > v.max) return 'Marks can’t be more than the total.';
+      if (v.max >= 100) return 'A 100-mark paper is a full paper: enter it in its slot below.';
+      if (t) store.put('tests', Object.assign({}, t, v)); else store.add('tests', Object.assign({ markedBy: 'Self' }, v), 'ts');
+      toast(t ? 'Saved' : 'Chapter test added');
+      return undefined;
+    },
+    onDelete: t ? () => { const old = store.remove('tests', t.id); toast('Test deleted', { action: { label: 'Undo', fn: () => store.put('tests', old) } }); } : null,
+    deleteBody: 'Its score leaves the pass forecast. Any mistakes it added stay in the Error Book.'
+  });
+}
+function testsCard(M) {
+  const all = sortBy(store.list('tests'), (x) => x.date).reverse();
+  return card({
+    cls: 'tests-card', id: 'chapter-tests', title: 'Chapter tests', icon: 'list', sub: 'Shorter tests feed the pass forecast, at a lower weight than full papers',
+    actions: html`<button type="button" class="btn sm" data-act="test-add">${icon('plus')}Add</button>`,
+    body: all.length ? html`<ul class="list">${all.slice(0, 12).map((t) => { const w = M.WMAP[t.paper] || {}; return html`<li><i class="dot" style="--c:${w.c || 'var(--ink-3)'}"></i><span class="li-main"><b>${t.test}</b><small>${w.code || ''} ${w.short || t.paper} · ${fmtD(t.date)}${t.markedBy ? ' · marked by ' + t.markedBy : ''}</small></span><span class="num"><b>${fmt1(t.marks)}</b><span class="muted small"> / ${t.max} · ${Math.round((t.marks / t.max) * 100)}%</span></span><button type="button" class="icon-btn sm" data-act="test-edit" data-id="${t.id}" aria-label="Edit ${t.test}">${icon('edit')}</button></li>`; })}</ul>${all.length > 12 ? html`<p class="hint">${all.length - 12} older tests also count.</p>` : ''}`
+      : empty('Tests Claude marks appear here. You can add your own too.', '', 'list')
   });
 }
 function roster(M) {
@@ -130,7 +158,7 @@ export default {
     const mk = M.mocks.find((x) => x.date === M.t && x.status !== 'skipped');
     return { title: 'Mock Tests', actions: raw('<button type="button" class="btn" data-act="mk-paste" title="Add a paper Claude marked: copy its “Vayu marking” block first">' + icon('copy') + 'Paste marking</button>' + (mk ? '<a class="btn primary" href="#/mocks?id=' + mk.id + '">' + icon('edit') + 'Today · mock #' + mk.id + ' ' + esc(mk.subject) + '</a>' : '')) };
   },
-  render(M) { return html`${stats(M)}${passOutlook(M, { cls: 'ol-card' })}${paperMultiples(M)}<div class="grid">${scorecard(M)}${roster(M)}</div>${series(M)}`; },
+  render(M) { return html`${stats(M)}${passOutlook(M, { cls: 'ol-card' })}${paperMultiples(M)}<div class="grid">${scorecard(M)}${roster(M)}</div>${testsCard(M)}${series(M)}`; },
   after(root) {
     paintPhotos(root);
     if (markingIn) {
@@ -144,6 +172,8 @@ export default {
   },
   actions: {
     'mk-paste': () => pasteMarking(modelOf()),
+    'test-add': () => openTest(modelOf()),
+    'test-edit': (el) => { const t = store.get('tests', el.dataset.id); if (t) openTest(modelOf(), t); },
     'mock-move': (el) => { const M = modelNow(), f = M.mocks.find((x) => x.id === +el.dataset.id); if (!f) return; const d = fixItDayFor(M, f); if (!d) { toast('All five fix-it days already hold a paper. Write this one on the next Sunday instead.', { tone: 'warn', ms: 6000 }); return; } store.setRecFields('mocks', f.id, { movedTo: d, skipped: null }); toast('Mock #' + f.id + ' moved to ' + fmtDL(d) + ', 2–5 PM'); },
     'mock-unmove': (el) => store.setRec('mocks', +el.dataset.id, 'movedTo', null),
     'mock-skip': (el) => store.setRec('mocks', +el.dataset.id, 'skipped', 'Yes'),

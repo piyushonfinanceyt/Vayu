@@ -251,10 +251,25 @@ function computeGame(st, t) {
   // Pass a group: 40 in every paper and 50% aggregate (150 of 300). A paper with 60+ is exempted if its group isn't cleared.
   // Likely score = recent form (the last 3 papers, newest counts most) + half the trend until that paper's exam day,
   // capped at ±10. The range is the spread of recent scores (5–15 marks), wider while there are few papers.
+  // Chapter tests cover one topic, so they're easier than a full paper: their last 5 count at 85% of their percentage,
+  // as 10% of the forecast (20% with 3+ tests and under 3 full papers). Before any full paper they're the whole forecast,
+  // with a wide range, shown only as an early signal: one topic can't put a paper on course, and the group stays undecided.
+  const allTests = store.list('tests');
+  const testForm = (key) => {
+    const ts = allTests.filter((x) => x.paper === key && +x.max > 0);
+    if (!ts.length) return null;
+    const last = sortBy(ts, (x) => x.date).slice(-5);
+    return { n: ts.length, v: (100 * sum(last, (x) => +x.marks || 0)) / sum(last, (x) => +x.max) * 0.85 };
+  };
+  const statusOf = (likely, low) => (likely >= 60 && low >= 40 ? 'strong' : low >= 40 ? 'safe' : likely >= 40 ? 'risk' : 'below');
   const outlookFor = (w) => {
     const pts = sortBy(mocks.filter((m) => m.subject === w.key && m.score != null), (m) => m.date).map((m) => ({ date: m.date, v: m.score * 100 }));
-    const examDay = EXAM_DAY[w.paper], n = pts.length;
-    if (!n) return Object.assign({}, w, { n: 0, examDay, status: 'none', need: null });
+    const examDay = EXAM_DAY[w.paper], n = pts.length, T = testForm(w.key), tests = T ? T.n : 0;
+    if (!n && !T) return Object.assign({}, w, { n: 0, tests: 0, seen: 0, examDay, status: 'none', need: null });
+    if (!n) {
+      const likely = Math.round(clamp(T.v, 0, 100)), low = Math.round(clamp(likely - 15, 0, 100)), high = Math.round(clamp(likely + 15, 0, 100));
+      return Object.assign({}, w, { n: 0, tests, seen: tests, examDay, likely, low, high, gain: 0, last: null, status: likely < 40 ? 'below' : 'early', need: Math.max(0, 40 - low) });
+    }
     const rec = pts.slice(-3), base = rec.reduce((a, p, i) => a + p.v * (i + 1), 0) / rec.reduce((a, p, i) => a + i + 1, 0);
     let gain = 0;
     if (n >= 3) {
@@ -265,21 +280,21 @@ function computeGame(st, t) {
     const last5 = pts.slice(-5), m5 = sum(last5, (p) => p.v) / last5.length;
     const sd = last5.length > 1 ? Math.sqrt(sum(last5, (p) => (p.v - m5) * (p.v - m5)) / (last5.length - 1)) : 0;
     const band = n === 1 ? 12 : clamp(sd, 5, 15) + (n < 3 ? 4 : 0);
-    const likely = Math.round(clamp(base + gain, 0, 100)), low = Math.round(clamp(likely - band, 0, 100)), high = Math.round(clamp(likely + band, 0, 100));
-    const status = likely >= 60 && low >= 40 ? 'strong' : low >= 40 ? 'safe' : likely >= 40 ? 'risk' : 'below';
-    return Object.assign({}, w, { n, examDay, likely, low, high, gain: Math.round(gain), last: Math.round(pts[n - 1].v), status, need: Math.max(0, 40 - low) });
+    const share = T ? (n < 3 && T.n >= 3 ? 0.2 : 0.1) : 0, blended = (base + gain) * (1 - share) + (T ? T.v * share : 0);
+    const likely = Math.round(clamp(blended, 0, 100)), low = Math.round(clamp(likely - band, 0, 100)), high = Math.round(clamp(likely + band, 0, 100));
+    return Object.assign({}, w, { n, tests, seen: n + tests, examDay, likely, low, high, gain: Math.round(gain), last: Math.round(pts[n - 1].v), status: statusOf(likely, low), need: Math.max(0, 40 - low) });
   };
   const olPapers = WORLDS.map(outlookFor);
   const olGroups = [['G1', 'Group I'], ['G2', 'Group II']].map(([id, name]) => {
-    const ps = olPapers.filter((p) => p.grp === id), known = ps.filter((p) => p.n);
+    const ps = olPapers.filter((p) => p.grp === id), known = ps.filter((p) => p.seen);
     const sumLikely = sum(known, (p) => p.likely), sumLow = sum(known, (p) => p.low);
-    const verdict = known.length < ps.length ? 'incomplete'
+    const verdict = ps.some((p) => !p.n) ? 'incomplete'
       : ps.every((p) => p.low >= 40) && sumLow >= 150 ? 'pass'
         : ps.every((p) => p.likely >= 40) && sumLikely >= 150 ? 'borderline' : 'notyet';
     return { id, name, papers: ps, known: known.length, sumLikely, sumLow, needAgg: known.length === ps.length ? Math.max(0, 150 - sumLikely) : null, verdict, dates: ps.map((p) => p.examDay) };
   });
   // the paper that most threatens a pass: furthest below 40 on a bad day; failing that, the lowest in a group short on aggregate
-  const olKnown = olPapers.filter((p) => p.n);
+  const olKnown = olPapers.filter((p) => p.seen);
   let weakest = sortBy(olKnown.filter((p) => p.low < 40), (p) => p.low)[0] || null;
   if (!weakest) { const g = olGroups.find((x) => x.needAgg > 0); if (g) weakest = sortBy(g.papers, (p) => p.likely)[0]; }
   const outlook = { papers: olPapers, groups: olGroups, weakest, taken: olKnown.length };

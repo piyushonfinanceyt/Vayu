@@ -43,25 +43,27 @@ export function paperBullets(M) {
 
 // ---------- "Will I pass?": each paper's likely exam score (model.outlook) against ICAI's rules ----------
 const OL_STATUS = {
-  strong: ['Exemption range', 'good'], safe: ['On course', 'good'], risk: ['At risk', 'warn'], below: ['Below 40', 'bad'], none: ['No paper yet', '']
+  strong: ['Exemption range', 'good'], safe: ['On course', 'good'], risk: ['At risk', 'warn'], below: ['Below 40', 'bad'], early: ['Early signal', ''], none: ['No paper yet', '']
 };
 const GROUP_VERDICT = {
   pass: ['On course to pass', 'good'], borderline: ['Borderline', 'warn'], notyet: ['Not passing yet', 'bad'], incomplete: ['Waiting for papers', '']
 };
 const olChip = (pair) => (pair[1] ? status(pair[0], pair[1]) : chip(pair[0]));
 // range bar on 0–100: the band is the likely range, the dot the likely score; ticks at 40 (pass) and 60 (exemption)
-const olBar = (p) => html`<span class="ol-bar" role="img" aria-label="${p.code} ${p.short}: likely ${p.likely} marks, range ${p.low} to ${p.high}" title="Likely ${p.likely} · range ${p.low}–${p.high} · last paper ${p.last}">
+const olBar = (p) => html`<span class="ol-bar" role="img" aria-label="${p.code} ${p.short}: likely ${p.likely} marks, range ${p.low} to ${p.high}" title="${'Likely ' + p.likely + ' · range ' + p.low + '–' + p.high + (p.last != null ? ' · last paper ' + p.last : ' · from chapter tests')}">
   <i class="ol-tick" style="left:40%"></i><i class="ol-tick ex" style="left:60%"></i>
   <i class="ol-band" style="left:${p.low}%;width:${Math.max(1, p.high - p.low)}%"></i><i class="ol-dot" style="left:${p.likely}%"></i></span>`;
 function olRow(M, p) {
-  const next = p.n ? null : M.mocks.find((m) => m.subject === p.key && m.score == null && m.status !== 'skipped');
-  const note = !p.n ? (next ? 'First paper ' + fmtD(next.date) : 'No paper scheduled')
+  const next = p.seen ? null : M.mocks.find((m) => m.subject === p.key && m.score == null && m.status !== 'skipped');
+  const src = [p.n ? plural(p.n, 'paper') : '', p.tests ? plural(p.tests, 'chapter test') : ''].filter(Boolean).join(' + ');
+  const note = !p.seen ? (next ? 'First paper ' + fmtD(next.date) : 'No paper scheduled')
+    : p.status === 'early' ? 'From chapter tests only · a full paper will confirm it'
     : p.need ? 'Needs +' + p.need + ' to clear 40 on a bad day'
-      : p.status === 'strong' ? 'Clears 60 even on a bad day' : 'Clears 40 even on a bad day';
+        : p.low >= 60 ? 'Clears 60 even on a bad day' : p.status === 'strong' ? 'Likely above 60, and clears 40 on a bad day' : 'Clears 40 even on a bad day';
   return html`<li class="ol-row">
-    <span class="ol-name"><i class="dot" style="--c:${p.c}"></i><span><b>${p.code} ${p.short}</b><small>${fmtDS(p.examDay)} · ${p.n ? plural(p.n, 'paper') : 'no marks yet'}</small></span></span>
-    ${p.n ? olBar(p) : html`<span class="ol-bar empty" aria-hidden="true"><i class="ol-tick" style="left:40%"></i><i class="ol-tick ex" style="left:60%"></i></span>`}
-    <span class="ol-num">${p.n ? html`<b>${p.likely}</b><small>${p.low}–${p.high}</small>` : html`<b>—</b>`}</span>
+    <span class="ol-name"><i class="dot" style="--c:${p.c}"></i><span><b>${p.code} ${p.short}</b><small>${fmtDS(p.examDay)} · ${src || 'no marks yet'}</small></span></span>
+    ${p.seen ? olBar(p) : html`<span class="ol-bar empty" aria-hidden="true"><i class="ol-tick" style="left:40%"></i><i class="ol-tick ex" style="left:60%"></i></span>`}
+    <span class="ol-num">${p.seen ? html`<b>${p.likely}</b><small>${p.low}–${p.high}</small>` : html`<b>—</b>`}</span>
     <span class="ol-st">${olChip(OL_STATUS[p.status])}<small>${note}</small></span></li>`;
 }
 function olGroup(M, g) {
@@ -75,17 +77,17 @@ function olGroup(M, g) {
 export function passOutlook(M, o = {}) {
   const O = M.outlook, w = O.weakest;
   let head;
-  if (!O.taken) head = 'Enter the marks from your first full paper and the forecast starts. Each subject needs at least one paper.';
+  if (!O.taken) head = 'Enter the marks from your first full paper or chapter test and the forecast starts.';
   else if (w) head = w.code + ' ' + w.short + ' is the risk: likely ' + w.likely + ' (' + w.low + '–' + w.high + ')' + (w.need ? ', so it needs +' + w.need + ' marks to clear 40 even on a bad day.' : ', the lowest in a group that is short on aggregate.');
   else if (O.groups.every((g) => g.verdict === 'pass')) head = 'On your current form both groups pass, with every paper above 40 even on a bad day.';
   else head = 'No paper is below 40 so far. Write the remaining subjects to complete the forecast.';
   return card({
     cls: o.cls || '', id: 'pass-outlook', title: 'Will I pass?', icon: 'target',
-    sub: 'Your likely exam score per paper, from your full papers · ICAI rules: 40 in each paper, 50% aggregate per group',
+    sub: 'Your likely exam score per paper, from full papers and chapter tests · ICAI rules: 40 in each paper, 50% aggregate per group',
     body: html`<div class="notice ol-head ${w && w.need ? 'warn' : ''}">${icon(w ? 'alert' : 'info')}<p>${head}</p></div>
       <div class="ol-groups">${O.groups.map((g) => olGroup(M, g))}</div>
       <div class="legend"><span><i class="key ol-k-band"></i>likely range</span><span><i class="key ol-k-dot"></i>likely score</span><span><i class="key ol-k-tick"></i>40 pass</span><span><i class="key ol-k-tick ex"></i>60 exemption</span></div>
-      <p class="hint">Likely score = your recent form (last 3 papers, the newest counts most) plus half your trend until that paper’s exam day, capped at ±10 marks. The range is how much your recent scores vary, and it’s wider while there are few papers. A paper with 60 or more is exempted if its group isn’t cleared. This is a guide from mock marks, not a promise.</p>`
+      <p class="hint">Likely score = your recent form (last 3 papers, the newest counts most) plus half your trend until that paper’s exam day, capped at ±10 marks. Chapter tests count for less, because they cover one topic. The range is how much your recent scores vary, and it’s wider while there are few papers. A paper with 60 or more is exempted if its group isn’t cleared. This is a guide from mock marks, not a promise.</p>`
   });
 }
 

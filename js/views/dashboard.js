@@ -13,6 +13,7 @@ import * as arc from '../arc.js';
 import * as pwa from '../pwa.js';
 import { promptWeek } from '../weekly.js';
 import { whatNow } from '../whatnow.js';
+import { hoursCheck } from '../hours.js';
 
 const STATUS_TONE = { ahead: 'good', ontrack: 'good', done: 'good', behind: 'warn', overdue: 'bad', upcoming: '', nodata: '' };
 
@@ -39,7 +40,7 @@ function blockState(M) {
 }
 function timetableCard(M, B) {
   const d = M.todayDay;
-  if (!d) return card({ cls: 'span-8', title: 'Today’s timetable', icon: 'clock', body: empty(M.t < M.FIRST ? 'The plan starts on ' + fmtDL(M.FIRST) + '.' : 'The plan is complete. Every block is behind you.', '', 'calendar') });
+  if (!d) return card({ cls: 'span-8 tt-card', title: 'Today’s timetable', icon: 'clock', body: empty(M.t < M.FIRST ? 'The plan starts on ' + fmtDL(M.FIRST) + '.' : 'The plan is complete. Every block is behind you.', '', 'calendar') });
   const agenda = html`<ol class="agenda">${B.blocks.map((b) => { const st = B.n >= b.end ? 'done' : B.n >= b.from ? 'cur' : ''; return html`<li class="${st}"><span class="ag-t num">${fmtClock(b.from)}</span><span class="ag-dot" aria-hidden="true"></span><span class="li-main"><b>${b.label}</b><small>${b.title}</small></span>${st === 'cur' ? chip('Now', 'ink') : ''}</li>`; })}</ol>`;
   return card({
     cls: 'span-8 tt-card', title: 'Today’s timetable', icon: 'clock',
@@ -67,6 +68,27 @@ function targetMeters(M) {
       <span class="mt-val"><b>${v == null ? '–' : f(v)}</b> / ${f(t)}${u ? ' ' + u : ''}</span>
       ${hit ? html`<span class="chip good">${icon('check')}Target hit</span>` : html`<span class="chip">${v == null ? 'Not logged' : f(Math.max(0, t - (+v || 0))) + (u ? ' ' + u : '') + ' to go'}</span>`}
     </button>`;
+  });
+}
+// "Can I finish?": hours needed against hours left, from your real pace (hours.js)
+function hoursCard(M) {
+  const H = hoursCheck(M, store.list('sessions'));
+  if (!H) return '';
+  const h = (x) => Math.round(x), late = H.finish ? (H.afterExam ? 'after the exam' : fmtDS(H.finish)) : '';
+  const tag = H.verdict === 'short' ? status('Not enough hours', 'bad') : H.verdict === 'core' ? status('Core only', 'warn') : H.onPace ? status('On pace', 'good') : status('Pace too low', 'warn');
+  const say = H.verdict === 'fits' ? 'Everything fits the plan’s hours.' : H.verdict === 'core' ? 'All of it doesn’t fit, but the core does: ' + plural(H.core, 'chapter') + ', ' + h(H.coreNeed) + ' h. That’s the HIGH chapters, plus enough of each paper to reach 40% of its hours.' : 'Even the core of ' + plural(H.core, 'chapter') + ' needs ' + h(H.coreNeed) + ' h, more than the ' + h(H.available) + ' h the plan gives.';
+  const rate = H.recent > 0 ? 'At your last 7 days’ rate, it ends ' + late + '.' : 'No hours logged in the last 7 days.';
+  const paceTxt = H.source === 'plan' ? 'plan estimates' : (H.pace >= 1 ? 'you run ' + H.pace.toFixed(1) + '× estimates' : 'you take ' + (1 / H.pace).toFixed(1) + '× estimates');
+  return card({
+    cls: 'hours-card', id: 'hours-check', title: 'Can I finish?', icon: 'gauge', sub: (H.isR1 ? 'R1 by ' : 'R1 by the end of revision, ') + fmtDS(H.until) + ' · ' + plural(H.days, 'day') + ' left', actions: tag,
+    body: html`<div class="hc-nums">
+        <div><span class="lbl">Hours needed</span><b>${h(H.need)}</b><small>${plural(H.open, 'chapter')} · ${paceTxt}</small></div>
+        <div><span class="lbl">Hours available</span><b>${h(H.available)}</b><small>your targets${H.papers ? ', less ' + plural(H.papers, 'full paper') : ''}</small></div>
+        <div><span class="lbl">Needed a day</span><b>${fmt1(H.perDay)}</b><small>you’re averaging ${fmt1(H.recent)}</small></div></div>
+      <div class="hbar" role="img" aria-label="${'Hours available cover ' + Math.min(100, Math.round((H.available / H.need) * 100)) + '% of the hours needed'}"><i class="on" style="width:${Math.min(100, (H.available / H.need) * 100).toFixed(1)}%"></i></div>
+      <p class="hc-say">${say} ${rate}</p>
+      ${H.sepOpen ? html`<p class="hint">${plural(H.sepOpen, 'chapter')} you covered in September count in full. Mark one done if it doesn’t need R1 again.</p>` : ''}
+      ${H.verdict !== 'fits' ? html`<a class="btn sm ghost" href="#/study-plan">Open Catch up${icon('arrowR')}</a>` : ''}`
   });
 }
 function whatNowCard(M) {
@@ -209,7 +231,7 @@ export default {
     const wk = promptWeek(M.t);
     const review = wk ? html`<section class="notice review-prompt" role="region" aria-label="Week in review">${icon('analytics')}<div class="grow"><p><b>Your week in review is ready</b> · ${fmtDS(wk)} – ${fmtDS(addDays(wk, 6))}</p><p class="muted">Hours, chapters, papers and mistakes against last week, with one focus for next week.</p></div><div class="row wrap"><button type="button" class="btn sm primary" data-act="review">Open the review</button><button type="button" class="btn sm ghost" data-act="review-later">Not now</button></div></section>` : '';
     return html`${welcome(M)}${review}
-      <div class="grid dash-r1"><div class="dash-left span-4">${countdown(M)}${whatNowCard(M)}</div>${timetableCard(M, B)}</div>
+      <div class="grid dash-r1">${countdown(M)}${whatNowCard(M)}${hoursCard(M)}${timetableCard(M, B)}</div>
       <div class="grid dash-r2"><div class="meters span-8">${targetMeters(M)}</div>${nextUp(M, B)}</div>
       <div class="grid dash-r3">${planCard(M)}${logCard(M)}${runCard(M)}</div>
       ${kpiRow(M)}
