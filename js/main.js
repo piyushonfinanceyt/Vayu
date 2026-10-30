@@ -3,7 +3,7 @@
    XP / level / badge celebrations. */
 import * as store from './store.js';
 import { model } from './model.js';
-import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now } from './util.js';
+import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now, nowMin } from './util.js';
 import { toast, menu, closeMenu, menuOpen, modalOpen } from './components.js';
 import { drawAll } from './charts.js';
 import { applyTheme, setTheme, resolvedTheme, onSystemTheme, setOpen, setPref } from './prefs.js';
@@ -16,11 +16,20 @@ import * as timer from './timer.js';
 import * as pwa from './pwa.js';
 import * as sync from './sync.js';
 import * as focus from './focus.js';
+import { whatNow, revisionItem } from './whatnow.js';
 import * as widgets from './widgets.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
+// "What now?": start the chosen task (a chapter or revision opens Deep focus already set up)
+function runNow(it) {
+  if (it.focus) { if (!focus.active()) timer.startFocus(it.mins, it.focus); focus.enter(); }
+  else if (it.log) openQuickLog();
+  else if (it.setup) focus.openSetup();
+  else if (it.href) go(it.href);
+}
 const commands = () => [
+  { label: 'What now?', hint: 'The best thing to do right now', icon: 'zap', fn: () => runNow(whatNow(model(), nowMin()).top) },
   { label: 'Fill in tonight’s 10 PM log', hint: 'Quick log · L', icon: 'logbook', fn: () => openQuickLog() },
   { label: 'Start deep focus', hint: 'Full screen · one paper, one chapter or general study', icon: 'target', fn: () => focus.openSetup() },
   { label: 'Start the focus timer', hint: 'Pomodoro, Deep Work or a short break', icon: 'timer', fn: () => timer.open() },
@@ -33,6 +42,8 @@ export const GLOBAL = {
   palette: () => openPalette(commands()),
   quicklog: (el) => openQuickLog(el && el.dataset && isDate(el.dataset.date) ? el.dataset.date : undefined),
   timer: () => (focus.active() ? focus.enter() : timer.open()),
+  'now-go': (el) => { const W = whatNow(model(), nowMin()), it = [W.top].concat(W.also).find((x) => x.id === el.dataset.id); if (it) runNow(it); },
+  'rev-focus': (el) => { const M = model(), x = M.revq.byId[el.dataset.id]; if (x) runNow(revisionItem(M, x, +(M.st.timer || {}).pomodoro || 25)); },
   focus: (el) => focus.openSetup(el && el.dataset && el.dataset.subject ? { kind: 'subject', subject: el.dataset.subject, chapterId: el.dataset.chapter || '' } : undefined),
   theme: toggleTheme,
   more: (el) => moreMenu(el),

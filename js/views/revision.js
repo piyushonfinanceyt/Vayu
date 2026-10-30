@@ -1,11 +1,48 @@
-/* Revision: R2 / R3 coverage, questions practised and revision days done; the "Ready for R2" and "Ready for R3"
-   queues (oldest first); revision by paper; the revision doses for the next 7 days. */
-import { html, raw, esc, fmt1, fmtD, fmtDS, sortBy, sum, pct, typeName } from '../util.js';
+/* Revision: today's spaced-revision dose (revise.js) and flashcards (cards.js); R2 / R3 coverage, questions practised and
+   revision days done; the "Ready for R2" and "Ready for R3" queues by due date; revision by paper; the revision doses
+   for the next 7 days. */
+import { html, raw, esc, fmt1, fmtD, fmtDS, sortBy, sum, pct, typeName, plural, todayStr } from '../util.js';
 import { icon } from '../icons.js';
-import { card, chip, ring, meter, empty, linkBtn } from '../components.js';
+import { card, chip, ring, meter, empty, linkBtn, seg } from '../components.js';
 import { bind } from './parts.js';
+import { pref, setPref } from '../prefs.js';
+import { renderSoon } from '../router.js';
+import * as store from '../store.js';
+import { cardsDue, drillCards, openCardForm, openBulk } from '../cards.js';
+
+let drillOnEnter = false;
+const lateText = (x) => (x.late > 0 ? plural(x.late, 'day') + ' late' : 'due today');
+
+function dueCard(M) {
+  const Q = M.revq, soon = Q.upcoming.slice(0, 3);
+  const row = (x) => html`<li class="rq"><span class="li-main"><b><i class="dot" style="--c:${M.WMAP[x.c.subject].c};margin-right:8px"></i>#${x.c.id} ${x.c.name}</b><small>${x.round} · ${x.c.paper} ${x.c.subject} · ${lateText(x)}${x.c.priority === 'HIGH' ? ' · high priority' : ''}${x.leaky ? ' · has open mistakes' : ''}</small></span>
+    <span class="row" style="gap:6px"><button type="button" class="btn sm" data-act="rev-focus" data-id="${x.c.id}">${icon('target')}Focus</button><button type="button" class="tog" ${bind('chapters', x.c.id, x.field, 'bool')} aria-pressed="false" aria-label="Mark ${x.round} done for chapter ${x.c.id}">${x.round} done</button></span></li>`;
+  return card({
+    id: 'rev-due', cls: 'rev-due', title: 'Revise today', icon: 'revision', sub: 'Most urgent first · R2 comes 5–10 days after R1, R3 10–18 days after R2, sooner for chapters with open mistakes',
+    actions: chip(Q.today.length + ' of ' + Q.dose + ' a day', Q.today.length ? 'ink' : ''),
+    body: html`${Q.today.length ? html`<ul class="list rq-list">${Q.today.map(row)}</ul>` : empty('Nothing due today. Chapters fall due a few days after you finish them.', '', 'checkCircle')}
+      ${Q.waiting ? html`<p class="hint">${plural(Q.waiting, 'more chapter')} waiting. They move up as you tick these off.</p>` : ''}
+      ${soon.length ? html`<p class="hint">Coming up: ${soon.map((x) => '#' + x.c.id + ' ' + x.round + ' on ' + fmtDS(x.due)).join(' · ')}</p>` : ''}`
+  });
+}
+
+function cardsCard(M) {
+  const all = store.list('cards'), due = cardsDue(M.t), filt = pref('cardPaper', 'all');
+  const list = sortBy(all.filter((c) => filt === 'all' || c.paper === filt), (c) => (c.fixed ? 'z' : '') + (c.dueOn || '')).slice(0, 30);
+  const when = (c) => (c.fixed ? 'Learned' : !c.dueOn || c.dueOn <= M.t ? 'Due now' : 'Next ' + fmtD(c.dueOn));
+  return card({
+    id: 'flashcards', title: 'Flashcards', icon: 'zap', sub: 'Sections, SAs, AS numbers and formulas · back after 1, 3, 7, 14, then 30 days',
+    actions: html`${due.length ? html`<button type="button" class="btn sm primary" data-act="card-drill">${icon('revision')}Drill ${due.length}</button>` : ''}<button type="button" class="btn sm" data-act="card-add">${icon('plus')}Add</button><button type="button" class="btn sm ghost" data-act="card-bulk">Add several</button>`,
+    body: all.length ? html`<p class="small muted">${plural(all.length, 'card')} · ${due.length} due · ${all.filter((c) => c.fixed).length} learned</p>
+      <div style="margin:10px 0">${seg('card-paper', [['all', 'All']].concat(M.worlds.map((w) => [w.key, w.code])), filt, { label: 'Paper' })}</div>
+      ${list.length ? html`<ul class="list">${list.map((c) => html`<li><span class="li-main"><b><i class="dot" style="--c:${(M.WMAP[c.paper] || {}).c || 'var(--ink-3)'};margin-right:8px"></i>${c.front}</b><small>${when(c)}${c.reviews ? ' · drilled ' + plural(c.reviews, 'time') : ''}</small></span><button type="button" class="icon-btn sm" data-act="card-edit" data-id="${c.id}" aria-label="Edit this card">${icon('edit')}</button></li>`)}</ul>` : html`<p class="muted small">No cards for this paper yet.</p>`}`
+      : empty('Add a card for each section, SA or formula you keep forgetting. You can also make one from any mistake in the Error Book.', html`<button type="button" class="btn sm" data-act="card-add">${icon('plus')}Add your first card</button>`, 'zap')
+  });
+}
 
 export default {
+  enter(q) { drillOnEnter = !!q.drill; },
+  after() { if (drillOnEnter) { drillOnEnter = false; setTimeout(() => drillCards(cardsDue(todayStr()), 'Flashcards · due today'), 80); } },
   head(M) { const r1 = M.chapters.filter((c) => c.rev1).length; return { title: 'Revision', sub: raw(esc('R2 ' + r1 + ' / ' + M.chapters.length + ' · Phase 2 starts ' + fmtDS(M.st.revisionStart) + ' · every chapter twice more by the ' + fmtDS(M.journey.finish) + ' finish line')) }; },
   render(M) {
     const ch = M.chapters, n = ch.length;
@@ -14,10 +51,11 @@ export default {
     const revDays = M.days.filter((d) => /Revision/.test(d.type)), revDone = revDays.filter((d) => d.rec.status === 'done').length, revPast = revDays.filter((d) => d.date <= M.t).length;
     const tile = (label, v, sub, p, hero) => html`<div class="tile ring-tile ${hero ? 'hero' : ''}"><span class="lbl">${label}</span><span class="row" style="gap:14px;margin-top:6px">${ring(p, { size: 58, stroke: 6, text: Math.round(p * 100) + '%', color: hero ? 'var(--on-hero)' : 'var(--ink)' })}<span><span class="value" style="margin:0">${v}</span><span class="tile-foot" style="padding:0">${sub}</span></span></span></div>`;
     const tiles = html`<div class="tiles">${tile('Revision R2', r1 + ' / ' + n, pct(r1 / n) + ' of chapters', r1 / n, true)}${tile('Revision R3', r2 + ' / ' + n, pct(r2 / n) + ' of chapters', r2 / n)}${tile('Questions practised', fmt1(qs) + ' / ' + n, '“Partly” counts half', qs / n)}${tile('Revision days done', revDone + ' / ' + revDays.length, revPast + ' scheduled so far', revDays.length ? revDone / revDays.length : 0)}</div>`;
-    const qRow = (c, f) => html`<li class="rq"><span class="li-main"><b><i class="dot" style="--c:${M.WMAP[c.subject].c};margin-right:8px"></i>#${c.id} ${c.name}</b><small>${c.paper} ${c.subject} · ${f === 'rev1' ? 'R1 done ' + fmtDS(c.doneAt) : 'R2 done ' + fmtDS(c.rev1At)}${c.priority === 'HIGH' ? ' · high priority' : ''}</small></span><button type="button" class="tog" ${bind('chapters', c.id, f, 'bool')} aria-pressed="false" aria-label="Mark ${f === 'rev1' ? 'R2' : 'R3'} done for chapter ${c.id}">${f === 'rev1' ? 'R2 done' : 'R3 done'}</button></li>`;
-    const q1 = sortBy(ch.filter((c) => c.status === 'done' && !c.rev1), (c) => c.doneAt || ''), q2 = sortBy(ch.filter((c) => c.rev1 && !c.rev2), (c) => c.rev1At || '');
-    const queues = html`<div class="grid">${card({ cls: 'span-6', title: 'Ready for R2', icon: 'revision', sub: 'Chapters with R1 done, oldest first', actions: chip(String(q1.length)), body: q1.length ? html`<ul class="list rq-list">${q1.slice(0, 25).map((c) => qRow(c, 'rev1'))}</ul>${q1.length > 25 ? html`<p class="hint">${q1.length - 25} more after these.</p>` : ''}` : empty('Chapters you finish appear here for their second pass.', linkBtn('#/subjects', 'Open Subjects'), 'revision') })}
-      ${card({ cls: 'span-6', title: 'Ready for R3', icon: 'revision', sub: 'Chapters with R2 done, oldest first', actions: chip(String(q2.length)), body: q2.length ? html`<ul class="list rq-list">${q2.slice(0, 25).map((c) => qRow(c, 'rev2'))}</ul>` : empty('Chapters with R2 done appear here for the final pass.', '', 'revision') })}</div>`;
+    const dueOf = (c) => (M.revq.byId[c.id] ? M.revq.byId[c.id].due : '');
+    const qRow = (c, f) => html`<li class="rq"><span class="li-main"><b><i class="dot" style="--c:${M.WMAP[c.subject].c};margin-right:8px"></i>#${c.id} ${c.name}</b><small>${c.paper} ${c.subject} · ${f === 'rev1' ? 'R1 done ' + fmtDS(c.doneAt) : 'R2 done ' + fmtDS(c.rev1At)}${dueOf(c) ? ' · due ' + fmtDS(dueOf(c)) : ''}${c.priority === 'HIGH' ? ' · high priority' : ''}</small></span><button type="button" class="tog" ${bind('chapters', c.id, f, 'bool')} aria-pressed="false" aria-label="Mark ${f === 'rev1' ? 'R2' : 'R3'} done for chapter ${c.id}">${f === 'rev1' ? 'R2 done' : 'R3 done'}</button></li>`;
+    const q1 = sortBy(ch.filter((c) => c.status === 'done' && !c.rev1), dueOf), q2 = sortBy(ch.filter((c) => c.rev1 && !c.rev2), dueOf);
+    const queues = html`<div class="grid">${card({ cls: 'span-6', title: 'Ready for R2', icon: 'revision', sub: 'Chapters with R1 done, by due date', actions: chip(String(q1.length)), body: q1.length ? html`<ul class="list rq-list">${q1.slice(0, 25).map((c) => qRow(c, 'rev1'))}</ul>${q1.length > 25 ? html`<p class="hint">${q1.length - 25} more after these.</p>` : ''}` : empty('Chapters you finish appear here for their second pass.', linkBtn('#/subjects', 'Open Subjects'), 'revision') })}
+      ${card({ cls: 'span-6', title: 'Ready for R3', icon: 'revision', sub: 'Chapters with R2 done, by due date', actions: chip(String(q2.length)), body: q2.length ? html`<ul class="list rq-list">${q2.slice(0, 25).map((c) => qRow(c, 'rev2'))}</ul>` : empty('Chapters with R2 done appear here for the final pass.', '', 'revision') })}</div>`;
     const bySubj = card({
       cls: 'span-7', title: 'Revision by paper', icon: 'book', sub: 'R2 and R3 ticks against the chapters in each paper',
       body: html`<ul class="rev-bars">${M.worlds.map((w) => html`<li><span class="row" style="gap:8px"><i class="dot" style="--c:${w.c}"></i><b style="font-weight:500">${w.code} ${w.short}</b></span>
@@ -29,6 +67,13 @@ export default {
       cls: 'span-5', title: 'The next 7 days', icon: 'calendar', sub: 'Revision dose for each day of the plan',
       body: next.length ? html`<ol class="timeline">${next.map((d) => html`<li class="${d.date === M.t ? 'today' : ''}"><span class="tl-date">${d.date === M.t ? 'Today' : fmtD(d.date)}</span><span class="tl-body"><a href="#/study-plan?date=${d.date}" style="text-decoration:none"><b>${d.rev}</b></a><small>${typeName(d.type)}${/Revision/.test(d.type) ? ' · ' + String(d.main).split('\n')[0] : ''}</small></span></li>`)}</ol>` : empty('The plan has ended.', '', 'calendar')
     });
-    return html`${tiles}${queues}<div class="grid">${bySubj}${upcoming}</div>`;
+    return html`${dueCard(M)}${tiles}${cardsCard(M)}${queues}<div class="grid">${bySubj}${upcoming}</div>`;
+  },
+  segs: { 'card-paper': (v) => { setPref('cardPaper', v); renderSoon(); } },
+  actions: {
+    'card-drill': () => drillCards(cardsDue(todayStr()), 'Flashcards · due today'),
+    'card-add': () => openCardForm(),
+    'card-bulk': () => openBulk(pref('cardPaper', 'all') === 'all' ? 'Accounts' : pref('cardPaper')),
+    'card-edit': (el) => { const c = store.get('cards', el.dataset.id); if (c) openCardForm(c); }
   }
 };

@@ -8,7 +8,7 @@ import { addDays, diff } from './util.js';
 
 export const GAPS = [1, 3, 7, 14, 30];
 // CA Inter Jan 2027, by Error Book paper key
-const EXAM = { Accounts: '2027-01-02', Law: '2027-01-04', Tax: '2027-01-06', Costing: '2027-01-08', Audit: '2027-01-10', 'FM&SM': '2027-01-12' };
+export const EXAM = { Accounts: '2027-01-02', Law: '2027-01-04', Tax: '2027-01-06', Costing: '2027-01-08', Audit: '2027-01-10', 'FM&SM': '2027-01-12' };
 
 export const errDue = (e, t) => !e.fixed && (e.dueOn ? e.dueOn <= t : (!e.reviewedAt || diff(e.reviewedAt, t) >= 3));
 

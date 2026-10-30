@@ -88,3 +88,15 @@ export function passOutlook(M, o = {}) {
       <p class="hint">Likely score = your recent form (last 3 papers, the newest counts most) plus half your trend until that paper’s exam day, capped at ±10 marks. The range is how much your recent scores vary, and it’s wider while there are few papers. A paper with 60 or more is exempted if its group isn’t cleared. This is a guide from mock marks, not a promise.</p>`
   });
 }
+
+// ---------- leak map: the chapters most likely to cost marks (leaks.js) ----------
+export function leakCard(M, o = {}) {
+  const L = M.leaks, top = L.length ? L[0].score : 1;
+  return card({
+    cls: 'leak-card ' + (o.cls || ''), id: 'leak-map', title: 'Leak map', icon: 'activity', sub: 'Where marks are most likely to slip: open mistakes, weak papers, and overdue work and revision',
+    body: L.length ? html`<ol class="leaks-map">${L.map((r, i) => { const w = M.WMAP[r.subject] || { code: '', c: 'var(--ink-3)' }; return html`<li><span class="lm-rank num">${i + 1}</span>
+        <span class="lm-main"><b><i class="dot" style="--c:${w.c}"></i>${w.code} ${r.c ? '#' + r.c.id + ' ' : ''}${r.name}</b><span class="hbar" role="img" aria-label="${'Risk score ' + r.score}"><i class="${i === 0 ? 'on' : ''}" style="width:${Math.max(4, r.score / top * 100).toFixed(1)}%"></i></span><small>${r.why.join(' · ')}</small></span>
+        <button type="button" class="btn sm" data-act="focus" data-subject="${r.subject}" data-chapter="${r.c && r.c.status !== 'done' ? r.c.id : ''}" aria-label="${'Deep focus on ' + r.name}">${icon('target')}Fix</button></li>`; })}</ol>`
+      : empty('No leaks yet. They appear as you log mistakes, write papers and reach deadlines.', '', 'checkCircle')
+  });
+}

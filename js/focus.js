@@ -32,7 +32,7 @@ const chapterOptions = (M, subject) => {
 const label = (M, f) => {
   if (!f || f.kind !== 'subject') return { name: 'General study', sub: f && f.intention ? '' : 'Any subject', c: 'var(--ink-3)' };
   const w = M.WMAP[f.subject] || {}, ch = f.chapterId ? M.chapters.find((c) => String(c.id) === String(f.chapterId)) : null;
-  return { name: (w.code ? w.code + ' ' : '') + (w.short || f.subject), sub: ch ? '#' + ch.id + ' ' + ch.name : 'Any chapter', c: w.c || 'var(--ink)' };
+  return { name: (w.code ? w.code + ' ' : '') + (w.short || f.subject) + (f.round ? ' · ' + f.round : ''), sub: ch ? '#' + ch.id + ' ' + ch.name : 'Any chapter', c: w.c || 'var(--ink)' };
 };
 
 // ---------- set up ----------
@@ -120,6 +120,7 @@ async function onClick(e) {
   if (a === 'done') { leave(); return; }
   if (a === 'break') { leave(); timer.reset('short'); timer.start(); toast('5-minute break started', { icon: 'timer' }); return; }
   if (a === 'again') { const f = b.dataset.f ? JSON.parse(b.dataset.f) : {}; leave(); openSetup(f); return; }
+  if (a === 'rev-done') { store.setRec('chapters', b.dataset.id, b.dataset.field, true); b.closest('.fx-ch').innerHTML = '<p class="fx-ok">' + icon('checkCircle') + esc(b.dataset.round) + ' marked done</p>'; return; }
   if (a === 'ch-done' || a === 'ch-prog') { store.setRec('chapters', b.dataset.id, 'status', a === 'ch-done' ? 'done' : 'progress'); b.closest('.fx-ch').innerHTML = '<p class="fx-ok">' + icon('checkCircle') + (a === 'ch-done' ? 'Marked done' : 'Marked in progress') + '</p>'; }
 }
 
@@ -134,6 +135,7 @@ timer.onFocusComplete((rec, s, full) => {
     <div class="fx-mid fx-end">${icon(full ? 'checkCircle' : 'flag')}<h2>${full ? 'Session complete' : mins ? 'Session ended' : 'Session ended early'}</h2>
       <p>${mins ? plural(mins, 'minute') + ' on ' + esc(L.name) + ' added to today’s study hours.' : 'Nothing was added: it was under a minute.'}</p>
       <p class="fx-meta">${+s.distractions ? plural(+s.distractions, 'lost-focus moment') : 'No lost-focus moments'} · ${esc(f.kind === 'subject' ? (M.WMAP[f.subject] || {}).short || f.subject : 'General')} this week ${fmtMins(wk[key] || 0)}</p>
+      ${ch && f.revField && mins ? `<div class="fx-ch"><p>#${ch.id} ${esc(ch.name)}</p><div class="row wrap" style="justify-content:center"><button type="button" class="btn" data-fx="rev-done" data-id="${ch.id}" data-field="${esc(f.revField)}" data-round="${esc(f.round)}">${icon('check')}Mark ${esc(f.round)} done</button></div></div>` : ''}
       ${ch && ch.status !== 'done' ? `<div class="fx-ch"><p>#${ch.id} ${esc(ch.name)}</p><div class="row wrap" style="justify-content:center"><button type="button" class="btn" data-fx="ch-done" data-id="${ch.id}">${icon('check')}Mark it done</button>${ch.status === 'pending' ? `<button type="button" class="btn ghost" data-fx="ch-prog" data-id="${ch.id}">Still in progress</button>` : ''}</div></div>` : ''}</div>
     <div class="fx-bot"><button type="button" class="btn fx-btn" data-fx="break">${icon('timer')}5-minute break</button><button type="button" class="btn fx-btn" data-fx="again" data-f="${esc(JSON.stringify({ kind: f.kind || 'general', subject: f.subject || pref('focusSubject', 'Accounts'), chapterId: f.chapterId || '', minutes: Math.round(s.dur / 60) }))}">${icon('reset')}Go again</button><button type="button" class="btn fx-btn primary" data-fx="done">Done</button></div>`;
   setTimeout(() => { const b = el && el.querySelector('[data-fx="done"]'); if (b) b.focus(); }, 30);

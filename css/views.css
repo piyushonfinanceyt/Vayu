@@ -635,3 +635,29 @@ body.focus-on { overflow: hidden; }
 .fx-ok svg { width: 18px; height: 18px; }
 @media (prefers-reduced-motion: reduce) { .fx-ring.fx-on svg { animation: none; } .focus-mode { animation: none; } }
 @media (max-width: 480px) { .fx-bot .fx-btn { flex: 1 1 30%; justify-content: center; padding-left: 8px; padding-right: 8px; } }
+
+/* ================= What now? (Dashboard) ================= */
+.wn { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "ic main go" "alt alt alt"; gap: 8px 14px; align-items: center; padding: 14px 18px; margin-bottom: 14px; border-radius: var(--r-card); background: var(--brand); color: var(--on-brand); }
+.wn-ic { grid-area: ic; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: color-mix(in srgb, var(--on-brand) 14%, transparent); }
+.wn-ic svg { width: 20px; height: 20px; }
+.wn-main { grid-area: main; display: grid; gap: 1px; min-width: 0; }
+.wn-main .lbl { color: color-mix(in srgb, var(--on-brand) 72%, transparent); }
+.wn-main b { font-size: 16px; font-weight: 500; line-height: 1.3; }
+.wn-main small { font-size: 12.5px; color: color-mix(in srgb, var(--on-brand) 78%, transparent); }
+.wn .wn-go { grid-area: go; background: var(--on-brand); color: var(--brand); border-color: transparent; white-space: nowrap; }
+.wn-alt { grid-area: alt; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; font-size: 12.5px; color: color-mix(in srgb, var(--on-brand) 72%, transparent); }
+.wn-alt .btn.link { color: var(--on-brand); font-size: 12.5px; text-align: left; white-space: normal; }
+@media (max-width: 600px) { .wn { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "ic main" "go go" "alt alt"; } .wn .wn-go { justify-content: center; } }
+
+/* ================= Revision and leak map ================= */
+.rev-due { margin-bottom: 14px; }
+#flashcards { margin-top: 14px; margin-bottom: 14px; }
+.leak-card { margin-bottom: 14px; }
+.leaks-map { display: grid; }
+.leaks-map li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.leaks-map li:first-child { border-top: 0; padding-top: 0; }
+.lm-rank { color: var(--ink-3); font-size: 13px; text-align: right; }
+.lm-main { display: grid; gap: 5px; min-width: 0; }
+.lm-main b { font-weight: 500; font-size: 13.5px; } .lm-main b .dot { margin-right: 8px; }
+.lm-main small { color: var(--ink-2); font-size: 12.5px; }
+.lm-main .hbar { height: 6px; }

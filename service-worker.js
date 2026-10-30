@@ -10,14 +10,14 @@
      plan stay right after midnight while the app is closed. With sync on, install/resume/activate/periodic sync first
      fetch the summary your other devices upload (vayu-widget.json), so the widgets follow what you log elsewhere.
    Bump VERSION when you deploy so installed copies pick up the new files. Your data (IndexedDB) is never touched. */
-const VERSION = 'fc-2026-10-27-8';
+const VERSION = 'fc-2026-10-30-1';
 const FONTS = 'fc-fonts';
 const WIDGET = 'fc-widget';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './data/seed.js',
   './css/tokens.css', './css/base.css', './css/shell.css', './css/components.css', './css/charts.css', './css/views.css',
   './js/main.js', './js/util.js', './js/icons.js', './js/db.js', './js/store.js', './js/model.js', './js/arc.js', './js/prefs.js',
-  './js/router.js', './js/shell.js', './js/components.js', './js/charts.js', './js/palette.js', './js/quicklog.js', './js/timer.js', './js/pwa.js', './js/merge.js', './js/sync.js', './js/replan.js', './js/drill.js', './js/weekly.js', './js/marking.js', './js/focus.js', './js/widgets.js',
+  './js/router.js', './js/shell.js', './js/components.js', './js/charts.js', './js/palette.js', './js/quicklog.js', './js/timer.js', './js/pwa.js', './js/merge.js', './js/sync.js', './js/replan.js', './js/drill.js', './js/weekly.js', './js/marking.js', './js/focus.js', './js/revise.js', './js/leaks.js', './js/drillui.js', './js/cards.js', './js/whatnow.js', './js/widgets.js',
   './js/views/parts.js', './js/views/insights.js', './js/views/dashboard.js', './js/views/goals.js', './js/views/study-plan.js', './js/views/daily-log.js',
   './js/views/subjects.js', './js/views/revision.js', './js/views/mocks.js', './js/views/errors.js', './js/views/notes.js', './js/views/habits.js',
   './js/views/journal.js', './js/views/finance.js', './js/views/health.js', './js/views/run-5k.js', './js/views/winter-arc.js', './js/views/resources.js',

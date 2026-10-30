@@ -7,7 +7,7 @@ import { html, raw, esc, fmt1, fmtN, fmtD, fmtDS, plural, diff, addDays, sum, pc
 import { icon } from '../icons.js';
 import { card, chip, status, tile, meter } from '../components.js';
 import { spot, gauge } from '../charts.js';
-import { studyHeatmap, heatLegend, paperMultiples, paperBullets, passOutlook } from './insights.js';
+import { studyHeatmap, heatLegend, paperMultiples, paperBullets, passOutlook, leakCard } from './insights.js';
 import { openReview } from '../weekly.js';
 import { model as modelOf } from '../model.js';
 
@@ -66,6 +66,7 @@ export default {
     const subj = card({ cls: 'span-5', title: 'Subject progress', icon: 'book', sub: 'Chapters done per paper', body: html`<ul class="hbars">${M.worlds.map((w) => html`<li><span class="row" style="gap:8px"><i class="dot" style="--c:${w.c}"></i>${w.code} ${w.short}</span><div class="hbar"><i style="width:${(w.pct * 100).toFixed(1)}%"></i></div><b class="num">${w.done}/${w.chapters}</b></li>`)}</ul>` });
     return html`${scoreboard(M)}${tiles}
       ${passOutlook(M, { cls: 'ol-card' })}
+      ${leakCard(M)}
       <div class="grid">${hoursBars}${cumCard}</div>
       ${paperMultiples(M, { prefix: 'amult-', title: 'Marks trend per paper' })}
       ${card({ title: 'Consistency', icon: 'calendar', sub: 'Every plan day, shaded by its share of the hours target', body: html`${heatLegend()}${studyHeatmap(M, { id: 'an-heat' })}` })}

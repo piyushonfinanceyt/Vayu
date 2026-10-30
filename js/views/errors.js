@@ -3,9 +3,12 @@
    with the fix for each type, open marks by paper, and every entry. */
 import { html, raw, esc, fmt1, fmtD, plural, diff, sortBy, sum, isDate, todayStr, addDays } from '../util.js';
 import { icon } from '../icons.js';
-import { card, chip, tile, empty, toast, menu, form, modal } from '../components.js';
+import { card, chip, tile, empty, toast, menu, form } from '../components.js';
 import { isOpen } from '../prefs.js';
 import { errDue, grade, nextText, GAPS } from '../drill.js';
+import { runDrill } from '../drillui.js';
+import { openCardForm } from '../cards.js';
+import { leakCard } from './insights.js';
 import * as store from '../store.js';
 
 export const ERR_TYPES = [
@@ -34,60 +37,18 @@ function row(M, e) {
 // ---------- drill: one card at a time, recall the rule, then Got it / Missed it ----------
 const dueList = (t) => sortBy(store.list('errors').filter((e) => errDue(e, t)), (e) => (e.dueOn || e.reviewedAt || e.date || '') + (e.createdAt || ''));
 const practiceList = () => sortBy(store.list('errors').filter((e) => !e.fixed), (e) => String(+e.box || 0) + (e.dueOn || e.date || ''));
-function openDrill(list, label) {
-  if (!list.length) { toast('Nothing to drill right now'); return; }
-  const t = todayStr(), queue = list.slice(0, 20).map((e) => e.id), tally = { got: 0, missed: 0, fixed: 0 };
-  let i = 0, shown = false, said = '';
-  const m = modal({ title: label, body: raw('<div class="drill" aria-live="polite"></div>'), foot: raw('<div class="drill-foot"></div>') });
-  const box = m.el.querySelector('.drill'), foot = m.el.querySelector('.drill-foot');
-  const paint = () => {
-    if (i >= queue.length) {
-      box.innerHTML = String(html`<div class="drill-done">${icon('checkCircle')}<h3>${plural(queue.length, 'mistake')} drilled</h3>
-        <p>${tally.got} got it · ${tally.missed} missed${tally.missed ? ', back tomorrow' : ''}${tally.fixed ? ' · ' + tally.fixed + ' fixed for good' : ''}</p>
-        <p class="muted small">Missed ones drop to the first box and come back tomorrow. Each Got it lengthens the gap: ${GAPS.join(', ')} days, then it’s fixed for good.</p></div>`);
-      foot.innerHTML = String(html`<button type="button" class="btn primary" data-done autofocus>Done</button>`);
-      foot.querySelector('[data-done]').focus();
-      return;
-    }
-    const e = store.get('errors', queue[i]);
-    if (!e) { i++; paint(); return; }
-    const ty = ERR_BY[e.type] || [e.type, e.type, ''], b = Math.min(+e.box || 0, GAPS.length - 1);
-    box.innerHTML = String(html`<div class="drill-top"><span>${i + 1} of ${queue.length}</span>${said ? html`<span class="drill-said">${said}</span>` : ''}<span class="drill-boxes" role="img" aria-label="${'Box ' + (b + 1) + ' of ' + GAPS.length}">${GAPS.map((g, k) => html`<i class="${k <= b && e.box != null ? 'on' : ''}"></i>`)}</span></div>
-      <article class="drill-card">
-        <div class="row wrap" style="gap:6px">${chip(paperName(e.paper), 'line')}${chip(ty[1], 'line')}<span class="muted small">−${fmt1(+e.marks || 0)} marks · ${fmtD(e.date)}${e.source ? ' · ' + e.source : ''}</span></div>
-        <h3>${e.chapter || 'A mistake in ' + paperName(e.paper)}</h3>
-        <p class="drill-q">${e.note ? 'Say the rule that stops this mistake, then check.' : 'Recall what went wrong here and how to avoid it, then check.'}</p>
-        ${shown ? html`<div class="drill-a">${e.note ? html`<span class="lbl">Your rule</span><p class="drill-rule">${e.note}</p>` : ''}<span class="lbl">The fix for ${ty[1].toLowerCase()} mistakes</span><p>${ty[2]}</p></div>` : ''}
-      </article>`);
-    foot.innerHTML = String(shown
-      ? html`<button type="button" class="btn" data-g="0">${icon('x')}Missed it <span class="kbd">1</span></button><button type="button" class="btn primary" data-g="1">${icon('check')}Got it <span class="kbd">2</span></button>`
-      : html`<button type="button" class="btn primary" data-flip>${icon('eye')}Show the rule <span class="kbd">Space</span></button>`);
-    (foot.querySelector('[data-g="1"]') || foot.querySelector('[data-flip]')).focus();
-  };
-  const answer = (ok) => {
-    const e = store.get('errors', queue[i]);
-    if (e) {
-      const p = grade(e, ok, t);
-      store.patch('errors', e.id, p);
-      if (ok) tally.got++; else tally.missed++;
-      if (p.fixed) tally.fixed++;
-      said = (ok ? 'Got it' : 'Missed') + ' · ' + nextText(p, t);
-    }
-    i++; shown = false; paint();
-  };
-  foot.addEventListener('click', (ev) => {
-    if (ev.target.closest('[data-flip]')) { shown = true; paint(); }
-    const g = ev.target.closest('[data-g]'); if (g) answer(g.dataset.g === '1');
-    if (ev.target.closest('[data-done]')) m.close();
-  });
-  m.el.addEventListener('keydown', (ev) => {
-    if (ev.target.matches('input, textarea, select') || i >= queue.length) return;
-    if (ev.key === ' ' && !shown) { ev.preventDefault(); shown = true; paint(); }
-    else if (shown && (ev.key === '1' || ev.key === 'ArrowLeft')) { ev.preventDefault(); answer(false); }
-    else if (shown && (ev.key === '2' || ev.key === 'ArrowRight')) { ev.preventDefault(); answer(true); }
-  });
-  paint();
-}
+const openDrill = (list, title) => runDrill({
+  coll: 'errors', title, list, noun: 'mistake', flip: 'Show the rule',
+  view: (e) => {
+    const ty = ERR_BY[e.type] || [e.type, e.type, ''];
+    return {
+      tags: html`${chip(paperName(e.paper), 'line')}${chip(ty[1], 'line')}<span class="muted small">−${fmt1(+e.marks || 0)} marks · ${fmtD(e.date)}${e.source ? ' · ' + e.source : ''}</span>`,
+      heading: e.chapter || 'A mistake in ' + paperName(e.paper),
+      prompt: e.note ? 'Say the rule that stops this mistake, then check.' : 'Recall what went wrong here and how to avoid it, then check.',
+      answer: html`${e.note ? html`<span class="lbl">Your rule</span><p class="drill-rule">${e.note}</p>` : ''}<span class="lbl">The fix for ${ty[1].toLowerCase()} mistakes</span><p>${ty[2]}</p>`
+    };
+  }
+});
 
 export default {
   enter(q) { preset = { paper: q.paper || '', mock: q.mock || '' }; drillOnEnter = !!q.drill; },
@@ -131,7 +92,7 @@ export default {
         <h3 class="sub-h">Open marks by paper</h3><ul class="hbars">${PAPERS.map((p) => html`<li><span>${p[1]}</span><div class="hbar"><i style="width:${((byPaper[p[0]] || 0) / maxP * 100).toFixed(1)}%"></i></div><b class="num">${fmt1(byPaper[p[0]] || 0)}</b></li>`)}</ul>`
     });
     const allCard = card({ cls: 'span-6', title: 'Every mistake', icon: 'list', actions: chip(plural(all.length, 'entry', 'entries')), body: all.length ? html`<details class="grp" data-key="err-all" ${raw(isOpen('err-all') ? 'open' : '')}><summary><b>Show every entry</b></summary><div class="grp-body"><ul class="list">${all.map((e) => row(M, e))}</ul></div></details>` : empty('Your first entry will appear here.', '', 'list') });
-    return html`${tiles}<div class="grid">${addCard}${queue}</div><div class="grid">${leaks}${allCard}</div>`;
+    return html`${tiles}<div class="grid">${addCard}${queue}</div>${leakCard(M)}<div class="grid">${leaks}${allCard}</div>`;
   },
   actions: {
     'err-add': () => {
@@ -149,6 +110,7 @@ export default {
       const e = store.get('errors', el.dataset.id); if (!e) return;
       menu(el, [
         { label: 'Edit', icon: 'edit', fn: () => form({ title: 'Edit mistake', fields: [{ name: 'date', label: 'Date', type: 'date', half: true, required: true }, { name: 'paper', label: 'Paper', type: 'select', half: true, options: PAPERS }, { name: 'chapter', label: 'Chapter' }, { name: 'type', label: 'Error type', type: 'select', half: true, options: ERR_TYPES.map((x) => [x[0], x[1]]) }, { name: 'marks', label: 'Marks lost', type: 'number', min: 0, step: 0.5, half: true }, { name: 'source', label: 'Source' }, { name: 'note', label: 'The rule' }], values: e, onSubmit: (v) => { store.put('errors', Object.assign({}, e, v)); toast('Saved'); } }) },
+        { label: 'Make a flashcard', icon: 'zap', fn: () => openCardForm(null, { paper: e.paper, front: e.chapter || e.point || '', back: e.note || '' }) },
         { label: e.fixed ? 'Reopen' : 'Fixed for good', icon: e.fixed ? 'reset' : 'checkCircle', fn: () => store.patch('errors', e.id, e.fixed ? { fixed: false, box: 0, dueOn: addDays(todayStr(), 1) } : { fixed: true, fixedAt: todayStr(), dueOn: null }) },
         '-',
         { label: 'Delete', icon: 'trash', fn: () => { const old = store.remove('errors', e.id); toast('Mistake deleted', { action: { label: 'Undo', fn: () => store.put('errors', old) } }); } }

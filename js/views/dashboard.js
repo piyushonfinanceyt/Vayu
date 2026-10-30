@@ -12,6 +12,7 @@ import * as store from '../store.js';
 import * as arc from '../arc.js';
 import * as pwa from '../pwa.js';
 import { promptWeek } from '../weekly.js';
+import { whatNow } from '../whatnow.js';
 
 const STATUS_TONE = { ahead: 'good', ontrack: 'good', done: 'good', behind: 'warn', overdue: 'bad', upcoming: '', nodata: '' };
 
@@ -67,6 +68,13 @@ function targetMeters(M) {
       ${hit ? html`<span class="chip good">${icon('check')}Target hit</span>` : html`<span class="chip">${v == null ? 'Not logged' : f(Math.max(0, t - (+v || 0))) + (u ? ' ' + u : '') + ' to go'}</span>`}
     </button>`;
   });
+}
+function whatNowCard(M) {
+  const W = whatNow(M, nowMin()), T = W.top;
+  return html`<section class="wn" aria-label="What now?"><span class="wn-ic">${icon(T.icon)}</span>
+    <div class="wn-main"><span class="lbl">What now?</span><b>${T.title}</b><small>${T.why}</small></div>
+    ${T.start ? html`<button type="button" class="btn wn-go" data-act="now-go" data-id="${T.id}">${icon(T.focus ? 'play' : 'arrowR')}${T.start}</button>` : ''}
+    ${W.also.length ? html`<div class="wn-alt"><span>Or</span>${W.also.map((x) => html`<button type="button" class="btn link" data-act="now-go" data-id="${x.id}">${x.title}</button>`)}</div>` : ''}</section>`;
 }
 function nextUp(M, B) {
   const t = M.t, n = B.n, d = M.todayDay;
@@ -200,7 +208,7 @@ export default {
     const B = blockState(M);
     const wk = promptWeek(M.t);
     const review = wk ? html`<section class="notice review-prompt" role="region" aria-label="Week in review">${icon('analytics')}<div class="grow"><p><b>Your week in review is ready</b> · ${fmtDS(wk)} – ${fmtDS(addDays(wk, 6))}</p><p class="muted">Hours, chapters, papers and mistakes against last week, with one focus for next week.</p></div><div class="row wrap"><button type="button" class="btn sm primary" data-act="review">Open the review</button><button type="button" class="btn sm ghost" data-act="review-later">Not now</button></div></section>` : '';
-    return html`${welcome(M)}${review}
+    return html`${welcome(M)}${review}${whatNowCard(M)}
       <div class="grid dash-r1">${countdown(M)}${timetableCard(M, B)}</div>
       <div class="grid dash-r2"><div class="meters span-8">${targetMeters(M)}</div>${nextUp(M, B)}</div>
       <div class="grid dash-r3">${planCard(M)}${logCard(M)}${runCard(M)}</div>
