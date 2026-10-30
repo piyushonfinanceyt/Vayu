@@ -118,10 +118,10 @@ async function png(M, R) {
   g.fillStyle = '#ffffff'; round(g, 48, 48, S - 96, H - 96, 40); g.fill();
   const x0 = 96;
   // header
-  g.fillStyle = brand; round(g, x0, 96, 64, 64, 18); g.fill();
-  g.strokeStyle = '#eef1ec'; g.lineWidth = 6; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.fillStyle = '#0b0b0a'; round(g, x0, 96, 64, 64, 18); g.fill();
+  g.strokeStyle = '#f4f3ee'; g.lineWidth = 6; g.lineCap = 'round'; g.lineJoin = 'round';
   g.beginPath(); g.moveTo(x0 + 16, 116); g.lineTo(x0 + 31, 148); g.lineTo(x0 + 46, 116); g.stroke();
-  g.fillStyle = '#eef1ec'; g.beginPath(); g.arc(x0 + 52, 110, 4.5, 0, 7); g.fill();
+  g.fillStyle = '#f4f3ee'; g.beginPath(); g.arc(x0 + 52, 110, 4.5, 0, 7); g.fill();
   g.fillStyle = ink; g.font = F(500, 26); g.fillText('V A Y U  ·  WEEK IN REVIEW', x0 + 88, 138);
   g.font = F(500, 64); g.fillText(fmtDS(R.start) + ' – ' + fmtDS(R.end), x0, 250);
   g.fillStyle = ink2; g.font = F(400, 28); g.fillText((R.name ? R.name + ' · ' : '') + 'CA Inter Jan 2027' + (R.partial ? ' · week so far' : ''), x0, 296);
