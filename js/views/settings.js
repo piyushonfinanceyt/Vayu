@@ -8,7 +8,7 @@ import * as sync from '../sync.js';
 import { go } from '../router.js';
 import { icon } from '../icons.js';
 import { card, chip, status, seg, toast, confirm, form } from '../components.js';
-import { themePref, setTheme } from '../prefs.js';
+import { themePref, setTheme, PALETTES, palettePref, setPalette } from '../prefs.js';
 import { renderSoon } from '../router.js';
 import * as store from '../store.js';
 import * as db from '../db.js';
@@ -75,7 +75,8 @@ export default {
   render(M) {
     const st = M.st, x = st.xp, theme = themePref(), exam = !!st.examMode;
     const profile = card({ cls: 'span-6', title: 'Profile and appearance', icon: 'user', body: html`<div class="fields">${field('Your name', 'player', 'text', st.player)}${field('Subtitle', 'subtitle', 'text', st.subtitle)}</div>
-      <div class="field" style="margin-top:14px"><span>Theme</span>${seg('theme', [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']], theme, { ink: true, label: 'Theme' })}<p class="hint">System follows your device’s light or dark setting. Saved on this device.</p></div>` });
+      <div class="field" style="margin-top:14px"><span>Theme</span>${seg('theme', [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']], theme, { ink: true, label: 'Theme' })}<p class="hint">System follows your device’s light or dark setting. Saved on this device.</p></div>
+      <div class="field" style="margin-top:14px"><span>Colour theme</span><div class="pal-picks" role="group" aria-label="Colour theme">${PALETTES.map((p) => html`<button type="button" class="pal" data-act="palette" data-id="${p.id}" aria-pressed="${String(palettePref() === p.id)}"><span class="pal-sw" aria-hidden="true">${p.swatch.map((c) => html`<i style="background:${c}"></i>`)}</span><b>${p.name}</b><small>${p.sub}</small></button>`)}</div><p class="hint">Each one has a light and a dark version. Saved on this device.</p></div>` });
     const examCard = card({ cls: 'span-6', title: 'Exam mode', icon: 'cap', body: html`<button type="button" class="tog" data-act="exam-mode" aria-pressed="${String(exam)}">Exam mode until ${fmtDS(st.examModeEnd || '2027-01-12')}</button><p class="hint">${exam ? 'On: Notes and Habit Tracker move from the top bar into More, so the bar keeps to what serves the exam. Nothing is hidden; every tab stays one tap away.' : 'Off: every Group 1 tab is in the top bar.'}</p>
       <div class="fields" style="margin-top:12px">${field('R1 deadline · all chapters once', 'syllabusDeadline', 'date', st.syllabusDeadline)}${field('Paper 1 date', 'examDate', 'date', st.examDate)}${field('Paper start time', 'examTime', 'time', st.examTime)}</div>` });
     const plan = card({ title: 'Plan and targets', icon: 'calcheck', body: html`<h3 class="sub-h" style="margin-top:0">Daily study target · hours a day</h3><div class="fields">${st.phases.map((p, i) => field(p.name + ' · ' + fmtDS(p.from) + ' → ' + fmtDS(p.to), 'phases.' + i + '.hrs', 'num', p.hrs, 'min="0" max="24"'))}</div>
@@ -108,6 +109,7 @@ export default {
     }
   },
   actions: {
+    palette: (el) => { setPalette(el.dataset.id); renderSoon(); toast((PALETTES.find((p) => p.id === el.dataset.id) || {}).name + ' theme', { icon: 'palette', ms: 1400 }); },
     'remind-toggle': async () => {
       if (pwa.reminder().on) { pwa.disableReminder(); toast('Reminder off'); return; }
       const p = await pwa.enableReminder();

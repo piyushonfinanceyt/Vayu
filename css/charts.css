@@ -76,5 +76,7 @@ g.hit:focus-visible rect { fill: var(--ink); fill-opacity: .04; }
 .anim .gauge .g-val { animation: draw 1.2s var(--ease) both; }
 .anim .ring .ring-v { animation: draw 1s var(--ease) both; }
 .ring-t { font-size: 13px; font-weight: 500; fill: var(--ink); }
+.hero .ring-t { fill: var(--on-hero); }
+.hero .ring circle:first-child { stroke: var(--hero-track); }
 .spark { color: var(--ink); }
 .hero .spark { color: var(--on-hero); }

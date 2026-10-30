@@ -17,10 +17,11 @@
 <script>
   // apply the saved theme before first paint ('system' follows the device)
   (function () {
-    var t = 'system';
-    try { t = (JSON.parse(localStorage.getItem('fc.prefs') || '{}') || {}).theme || 'system'; } catch (e) {}
+    var t = 'system', p = '';
+    try { var o = JSON.parse(localStorage.getItem('fc.prefs') || '{}') || {}; t = o.theme || 'system'; p = o.palette || ''; } catch (e) {}
     if (t !== 'light' && t !== 'dark') t = window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', t);
+    if (p === 'summer' || p === 'orchid' || p === 'granite') document.documentElement.setAttribute('data-palette', p);
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">

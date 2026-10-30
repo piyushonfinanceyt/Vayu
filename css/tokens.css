@@ -18,8 +18,9 @@
   --hatch: #c9c7be;
   --track: #ebe9e3;
 
-  --brand: #14393a;         /* Vayu: deep sea-teal, used only for the mark and the app icon */
+  --brand: #14393a;         /* Vayu: deep sea-teal, for the mark, the app icon and the What now? card */
   --on-brand: #eef1ec;
+  --on-brand-2: #b9cbc6;    /* quieter text on --brand */
   --hero: #121211;          /* the one near-black card per row */
   --on-hero: #f4f3ee;
   --on-hero-2: #a9a79f;
@@ -64,6 +65,7 @@
   --track: #2a2a27;
   --brand: #1f5052;
   --on-brand: #eef1ec;
+  --on-brand-2: #c6d6d2;
   --hero: #f1f0eb;
   --on-hero: #121211;
   --on-hero-2: #5f5d57;
@@ -83,11 +85,60 @@
     --bg: #0c0c0b; --surface: #171716; --soft: #20201e; --soft-2: #1f1f1d;
     --ink: #f1f0eb; --ink-2: #c4c2b9; --ink-3: #9b998f; --ink-4: #6a6862;
     --line: #2a2a27; --line-2: #3a3935; --hatch: #44433e; --track: #2a2a27;
-    --brand: #1f5052; --on-brand: #eef1ec;
+    --brand: #1f5052; --on-brand: #eef1ec; --on-brand-2: #c6d6d2;
     --hero: #f1f0eb; --on-hero: #121211; --on-hero-2: #5f5d57; --hero-track: #d3d1c8;
     --good: #5fd391; --good-bg: #102a1b; --good-mark: #3fbf73;
     --warn: #f2b955; --warn-bg: #2f2410; --warn-mark: #e3a136;
     --bad: #ff8a80; --bad-bg: #351715; --bad-mark: #f0625a;
     --info: #8db8f5; --info-bg: #14243b;
   }
+}
+
+/* Colour themes (Settings → Colour theme; prefs.js sets data-palette). Each has a light and a dark set, written after the
+   base so they win, and redefines only the surfaces, text and accents: status colours and the six paper colours keep
+   their meaning in every theme. --hero is the one contrasting card, the bars and primary buttons; --brand is the mark
+   and the What now? card. Text on the coral accents is dark, because white on them falls short of 4.5:1. */
+:root[data-palette="summer"] {            /* Summer Aqua #79C9C5 · Peach Honey #FFE2AF · Coral Sunset #F96E5B */
+  --bg: #ffe2af; --surface: #fff9ec; --soft: #fdd698; --soft-2: #fff0d4;
+  --ink: #2a1a10; --ink-2: #523c2c; --ink-3: #684f3d; --ink-4: #a58a6e;
+  --line: #f4dcb0; --line-2: #e3c48f; --hatch: #d9b87f; --track: #fbe7c2;
+  --brand: #f96e5b; --on-brand: #3a0e07; --on-brand-2: #4d170e;
+  --hero: #79c9c5; --on-hero: #0c3331; --on-hero-2: #154a47; --hero-track: #5eb0ac;
+  --good: #0f6a37; --warn: #7a4900; --bad: #a42824;
+}
+:root[data-palette="summer"][data-theme="dark"] {
+  --bg: #0e1f20; --surface: #152b2c; --soft: #1c3738; --soft-2: #1b3435;
+  --ink: #fff1d9; --ink-2: #e8d6b8; --ink-3: #b7ab94; --ink-4: #7c7a6c;
+  --line: #254041; --line-2: #345455; --hatch: #406263; --track: #254041;
+  --brand: #f96e5b; --on-brand: #3a0e07; --on-brand-2: #4d170e;
+  --hero: #ffe2af; --on-hero: #2a1a10; --on-hero-2: #62492f; --hero-track: #ecca8e;
+  --good: #5fd391; --warn: #f2b955; --bad: #ff9a8d;
+}
+:root[data-palette="orchid"] {            /* Orchid Wine #6A425C · Vanilla Cloud #FFFBE3 · Coral Kiss #FFA9A9 */
+  --bg: #fffbe3; --surface: #ffffff; --soft: #f9ecdc; --soft-2: #fff7e4;
+  --ink: #2c1a26; --ink-2: #53394b; --ink-3: #6e5666; --ink-4: #ad9aa0;
+  --line: #f1e6d6; --line-2: #e2d2c6; --hatch: #d8c6bd; --track: #f6eddc;
+  --brand: #ffa9a9; --on-brand: #451a30; --on-brand-2: #5a2a42;
+  --hero: #6a425c; --on-hero: #fffbe3; --on-hero-2: #e9d3d9; --hero-track: #875f79;
+}
+:root[data-palette="orchid"][data-theme="dark"] {
+  --bg: #1b1017; --surface: #281923; --soft: #33222d; --soft-2: #30202a;
+  --ink: #fffbe3; --ink-2: #ebdbd0; --ink-3: #bfa9b1; --ink-4: #85717c;
+  --line: #3d2a36; --line-2: #503946; --hatch: #5d4453; --track: #3d2a36;
+  --brand: #ffa9a9; --on-brand: #451a30; --on-brand-2: #5a2a42;
+  --hero: #fffbe3; --on-hero: #3a2232; --on-hero-2: #6a425c; --hero-track: #ebdfc6;
+}
+:root[data-palette="granite"] {           /* Coral Pink #EF5A6F · Buttercream #FFF1DB · Blue Granite #536493 */
+  --bg: #fff1db; --surface: #fffbf3; --soft: #f8e3c6; --soft-2: #fff5e6;
+  --ink: #1d2338; --ink-2: #3d455f; --ink-3: #565d78; --ink-4: #a09c9f;
+  --line: #f1e0c6; --line-2: #e2ceb0; --hatch: #d6c3a6; --track: #f8e8d0;
+  --brand: #ef5a6f; --on-brand: #2e060f; --on-brand-2: #3a0a15;
+  --hero: #536493; --on-hero: #fffcf5; --on-hero-2: #f4f1ee; --hero-track: #6c7dab;
+}
+:root[data-palette="granite"][data-theme="dark"] {
+  --bg: #13172a; --surface: #1d2237; --soft: #262c44; --soft-2: #242a41;
+  --ink: #fff1db; --ink-2: #e5dacb; --ink-3: #afb1bf; --ink-4: #777b90;
+  --line: #2d3350; --line-2: #3e4567; --hatch: #4a5277; --track: #2d3350;
+  --brand: #ef5a6f; --on-brand: #2e060f; --on-brand-2: #3a0a15;
+  --hero: #fff1db; --on-hero: #1c2238; --on-hero-2: #434f78; --hero-track: #e8d8be;
 }
