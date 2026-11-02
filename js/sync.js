@@ -6,7 +6,7 @@
      passphrase (PBKDF2). A secret gist is readable by anyone who has its link, so only scrambled text goes there.
    - Saved on this device only, never in backups: the GitHub token (scope "gist"), and the derived key (not the passphrase).
    - It runs when the app opens or comes back on screen, a few seconds after you change something, when you leave the
-     app, every 3 minutes while it's open, and when the connection returns.
+     app, every minute while it's open, and when the connection returns.
    - A replace (import, restore point, reset) carries an epoch: devices that see a newer epoch drop what they had from
      before it, so the replace reaches them too. The first sync of a device always merges and never replaces.
    - A second file, vayu-widget.json, holds the Windows widgets' summary of today and the next 6 days (widgets.js),
@@ -50,7 +50,17 @@ async function gh(path, opts = {}, token = cfg.token) {
     });
   } catch (e) { throw fail('offline', 'Can’t reach GitHub. Vayu syncs again when you’re back online.'); }
   if (res.status === 401) throw fail('token', 'GitHub didn’t accept the token. It may have expired or been deleted: create a new one and paste it below.');
-  if ((res.status === 403 || res.status === 429) && res.headers.get('x-ratelimit-remaining') === '0') throw fail('rate', 'GitHub’s hourly limit is used up. Sync resumes within the hour.');
+  // GitHub also answers 403 or 429 to "slow down" (a secondary limit, with Retry-After). That's a wait, not a bad token:
+  // treating it as one stopped syncing on that device until you opened Settings.
+  if (res.status === 403 || res.status === 429) {
+    let msg = '';
+    try { msg = String((await res.clone().json()).message || ''); } catch (e) { /* no JSON body */ }
+    const wait = +res.headers.get('retry-after') || 0;
+    if (res.headers.get('x-ratelimit-remaining') === '0' || wait || res.status === 429 || /rate limit|abuse|slow down/i.test(msg)) {
+      backoffUntil = Date.now() + Math.max(60, wait || 300) * 1000;
+      throw fail('rate', 'GitHub asked Vayu to slow down. Sync resumes in a few minutes.');
+    }
+  }
   if (res.status === 403 || (res.status === 404 && opts.write)) throw fail('token', 'This token can’t save gists. Create one with the “gist” box ticked.');
   if (res.status === 404 && opts.allow404) return null;
   if (!res.ok) throw fail('github', 'GitHub answered with error ' + res.status + '. Vayu will try again shortly.');
@@ -154,10 +164,15 @@ export function disconnect() {
 // ---------- one sync ----------
 let running = null, again = false, timer = 0, lastTry = 0, seq = 0, cleanSeq = 0;
 export const needsYou = () => state.kind === 'token' || state.kind === 'pass';
+// the one line other screens show: is this device up to date with the others?
+export const statusText = () => (!connected() ? 'Sync is off' : state.busy ? 'Syncing…' : needsYou() ? 'Sync needs attention' : state.kind === 'rate' ? 'Sync paused for a few minutes' : state.kind === 'offline' ? 'Offline · last synced ' + ago(state.lastAt) : state.lastAt ? 'Synced ' + ago(state.lastAt) : 'Not synced yet');
+let backoffUntil = 0;
 export function syncNow(reason) {
   if (!connected()) return Promise.resolve(null);
   // a bad token or passphrase won't fix itself: wait for you instead of retrying in the background
   if (needsYou() && reason !== 'connect' && reason !== 'manual') return Promise.resolve(null);
+  // GitHub asked us to slow down: background syncs wait it out; "Sync now" tries anyway
+  if (Date.now() < backoffUntil && reason !== 'connect' && reason !== 'manual') return Promise.resolve(null);
   if (running) { again = true; return running; }
   lastTry = Date.now();
   const startSeq = seq;
@@ -227,13 +242,14 @@ export function start() {
     seq++;
     schedule();
   });
-  const pull = () => { if (Date.now() - lastTry > 30000) schedule(700); };
+  // coming back to the app: catch up now (at most every 8 seconds), so one device doesn't show what the other already changed
+  const pull = () => { if (Date.now() - lastTry > 8000) schedule(300); };
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) { pull(); return; }
     if (seq !== cleanSeq) { clearTimeout(timer); syncNow('leave'); }
   });
   window.addEventListener('focus', pull);
   window.addEventListener('online', () => schedule(600));
-  setInterval(() => { if (!document.hidden) syncNow('poll'); }, 3 * 60 * 1000);
+  setInterval(() => { if (!document.hidden) syncNow('poll'); }, 60 * 1000);   // nothing pushes to an open app, so it asks every minute
   schedule(1200);
 }

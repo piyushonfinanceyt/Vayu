@@ -42,6 +42,7 @@ export const GLOBAL = {
   palette: () => openPalette(commands()),
   quicklog: (el) => openQuickLog(el && el.dataset && isDate(el.dataset.date) ? el.dataset.date : undefined),
   timer: () => (focus.active() ? focus.enter() : timer.open()),
+  'sync-refresh': async () => { try { const r = await sync.syncNow('manual'); toast(r && r.pulled ? 'Synced · ' + plural(r.pulled, 'update') + ' from your other device' : 'Up to date', { icon: 'sync', ms: 2000 }); } catch (e) { toast(e.message, { tone: e.kind === 'offline' ? 'warn' : 'bad', ms: 6000 }); } },
   'now-go': (el) => { const W = whatNow(model(), nowMin()), it = [W.top].concat(W.also).find((x) => x.id === el.dataset.id); if (it) runNow(it); },
   'rev-focus': (el) => { const M = model(), x = M.revq.byId[el.dataset.id]; if (x) runNow(revisionItem(M, x, +(M.st.timer || {}).pomodoro || 25)); },
   focus: (el) => focus.openSetup(el && el.dataset && el.dataset.subject ? { kind: 'subject', subject: el.dataset.subject, chapterId: el.dataset.chapter || '' } : undefined),
@@ -194,7 +195,14 @@ async function boot() {
   pwa.registerSW((hash) => go(hash));
   pwa.onChange(() => renderSoon());
   // sync between devices (Settings → Sync between devices); does nothing until you connect it
-  sync.onChange(() => renderSoon());
+  // the sync line updates in place; a full redraw only when the Settings card or the connection itself changes
+  let syncKey = '';
+  const syncLines = () => $$('[data-sync-ago]').forEach((el) => { const t = sync.statusText(); if (el.textContent !== t) el.textContent = t; });
+  sync.onChange(() => {
+    const key = sync.connected() + '|' + (sync.state.kind || '');
+    if (key !== syncKey || (current() && current().id === 'settings')) { syncKey = key; renderSoon(); } else syncLines();
+  });
+  setInterval(syncLines, 15000);
   sync.start();
   // the Windows widgets' snapshot and the app-icon badge
   widgets.refresh();

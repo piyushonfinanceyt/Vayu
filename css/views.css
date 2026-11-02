@@ -684,3 +684,11 @@ body.focus-on { overflow: hidden; }
 .pal b { font-weight: 500; font-size: 13.5px; }
 .pal small { color: var(--ink-3); font-size: 12px; line-height: 1.3; }
 .pal[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+
+/* sync status line under "Can I finish?" */
+.hc-sync { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.hc-sync svg { width: 14px; height: 14px; flex: none; }
+.hc-sync .btn.link { font-size: 12.5px; }
+.hc-sync a { color: var(--ink-2); text-underline-offset: 3px; }
+.hc-sync.bad { color: var(--bad); }
+.hc-sync.bad a { color: var(--bad); }

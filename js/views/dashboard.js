@@ -14,6 +14,7 @@ import * as pwa from '../pwa.js';
 import { promptWeek } from '../weekly.js';
 import { whatNow } from '../whatnow.js';
 import { hoursCheck } from '../hours.js';
+import * as sync from '../sync.js';
 
 const STATUS_TONE = { ahead: 'good', ontrack: 'good', done: 'good', behind: 'warn', overdue: 'bad', upcoming: '', nodata: '' };
 
@@ -88,8 +89,15 @@ function hoursCard(M) {
       <div class="hbar" role="img" aria-label="${'Hours available cover ' + Math.min(100, Math.round((H.available / H.need) * 100)) + '% of the hours needed'}"><i class="on" style="width:${Math.min(100, (H.available / H.need) * 100).toFixed(1)}%"></i></div>
       <p class="hc-say">${say} ${rate}</p>
       ${H.sepOpen ? html`<p class="hint">${plural(H.sepOpen, 'chapter')} you covered in September count in full. Mark one done if it doesn’t need R1 again.</p>` : ''}
-      ${H.verdict !== 'fits' ? html`<a class="btn sm ghost" href="#/study-plan">Open Catch up${icon('arrowR')}</a>` : ''}`
+      ${H.verdict !== 'fits' ? html`<a class="btn sm ghost" href="#/study-plan">Open Catch up${icon('arrowR')}</a>` : ''}
+      ${syncLine()}`
   });
+}
+// whether this device is up to date with the others: these numbers come from what's saved here
+function syncLine() {
+  if (!sync.connected()) return html`<p class="hc-sync off">${icon('cloudOff')}<span>Sync is off on this device, so these numbers use only what’s saved here. <a href="#/settings">Turn it on</a></span></p>`;
+  const bad = sync.needsYou();
+  return html`<p class="hc-sync ${bad ? 'bad' : ''}">${icon(bad ? 'alert' : 'sync')}<span data-sync-ago>${sync.statusText()}</span>${bad ? html`<a href="#/settings">Fix it</a>` : html`<button type="button" class="btn link" data-act="sync-refresh">Sync now</button>`}</p>`;
 }
 function whatNowCard(M) {
   const W = whatNow(M, nowMin()), T = W.top;
