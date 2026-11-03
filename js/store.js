@@ -14,8 +14,9 @@
    For merging copies between devices (merge.js, sync.js): plan records stamp each written field in _f, deletions
    leave a tombstone in meta.tombs, and a replace (import, restore point, reset) sets meta.epoch. */
 import * as db from './db.js';
-import { clone, isObj, nv, todayStr, uid } from './util.js';
+import { clone, isObj, nv, todayStr, uid, addDays } from './util.js';
 import { canon, mergeData, changes } from './merge.js';
+import { CONTENT_RELEASE } from './content.js';
 
 const round2 = (x) => Math.round(x * 100) / 100;
 
@@ -23,7 +24,7 @@ const D = window.__FC_DATA__;
 export { D };
 
 export const LEGACY = ['days', 'chapters', 'mocks', 'runs'];
-export const LISTS = ['goals', 'tasks', 'schedule', 'habits', 'habitLogs', 'notes', 'milestones', 'lifeAreas', 'progress', 'sessions', 'resources', 'finance', 'arc', 'journal', 'logs', 'errors', 'cards', 'tests'];
+export const LISTS = ['goals', 'tasks', 'schedule', 'habits', 'habitLogs', 'notes', 'milestones', 'lifeAreas', 'progress', 'sessions', 'resources', 'finance', 'arc', 'journal', 'logs', 'errors', 'cards', 'tests', 'content'];
 export const COLLS = LEGACY.concat(LISTS);
 
 // the original tracker's starting log (your 25 Sep entries), used on a fresh device
@@ -54,7 +55,8 @@ const APP_DEFAULTS = {
   examTime: '14:00',
   timer: { pomodoro: 25, deep: 50, short: 5 },
   habitsHidden: [],
-  finance: { budget: null, savingsTarget: null }
+  finance: { budget: null, savingsTarget: null },
+  content: { yt: 1, ig: 3 }     // videos a week for the YouTube channel and posts a week for the Instagram page (content.js)
 };
 const DEF = (() => { const s = clone(D.settings); Object.keys(APP_DEFAULTS).forEach((k) => { if (s[k] === undefined) s[k] = clone(APP_DEFAULTS[k]); }); return s; })();
 function merge(a, b) {
@@ -273,12 +275,22 @@ export function defaultGoals() {
     { id: 'g_run5k', title: 'Run 5 km in 30:00 before 1 Dec', category: 'Health', source: 'run5k', startDate: '2026-10-24', deadline: '2026-11-30', status: 'active', order: 7 }
   ];
 }
+const channelGoal = () => ({ id: 'g_channel', title: 'Run Piyush on Finance: YouTube and Instagram', category: 'Content', source: 'content', startDate: CONTENT_RELEASE, deadline: addDays(CONTENT_RELEASE, 84), status: 'active', order: 8, notes: 'Progress is the uploads you log against your weekly targets for the first 12 weeks. Set the targets in the Piyush on Finance panel.' });
+// called when a day starts: the goal appears on the release date, even if the app was already open
+export function releaseCheck() {
+  const had = !!(S.meta.seeded && S.meta.seeded.channelGoal);
+  ensureDefaults();
+  if (!had && S.meta.seeded.channelGoal) emit({ coll: 'goals', id: 'g_channel' });
+  return !had && !!S.meta.seeded.channelGoal;
+}
 function ensureDefaults() {
   S.meta.seeded = S.meta.seeded || {};
   const seeded = S.meta.seeded, q = { quiet: true, seed: true };
   let changed = false;
   if (!seeded.lifeAreas) { defaultAreas().forEach((a) => put('lifeAreas', a, q)); seeded.lifeAreas = true; changed = true; }
   if (!seeded.goals) { defaultGoals().forEach((g) => put('goals', g, q)); seeded.goals = true; changed = true; }
+  // the channel goal stays out of sight (it isn't even created) until the day after the last paper
+  if (!seeded.channelGoal && todayStr() >= CONTENT_RELEASE) { put('goals', channelGoal(), q); seeded.channelGoal = true; changed = true; }
   if (!seeded.resources) {
     put('resources', { id: 'rs_icai', title: 'ICAI — official site (exam dates & notices)', url: 'https://www.icai.org', type: 'Link', subject: '', notes: 'Your plan says: check icai.org for any change to the CA Inter Jan 2027 dates.', pinned: true }, q);
     seeded.resources = true; changed = true;

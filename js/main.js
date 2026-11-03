@@ -16,6 +16,8 @@ import * as timer from './timer.js';
 import * as pwa from './pwa.js';
 import * as sync from './sync.js';
 import * as focus from './focus.js';
+import * as contentui from './contentui.js';
+import { contentOn } from './content.js';
 import { whatNow, revisionItem } from './whatnow.js';
 import * as widgets from './widgets.js';
 
@@ -42,6 +44,11 @@ export const GLOBAL = {
   palette: () => openPalette(commands()),
   quicklog: (el) => openQuickLog(el && el.dataset && isDate(el.dataset.date) ? el.dataset.date : undefined),
   timer: () => (focus.active() ? focus.enter() : timer.open()),
+  'ct-log': () => contentui.logUpload(),
+  'ct-plan': () => contentui.planVideo(),
+  'ct-up': (el) => contentui.markUploaded(el.dataset.id),
+  'ct-edit': (el) => contentui.editEntry(el.dataset.id),
+  'ct-targets': () => contentui.setTargets(model().st),
   'sync-refresh': async () => { try { const r = await sync.syncNow('manual'); toast(r && r.pulled ? 'Synced · ' + plural(r.pulled, 'update') + ' from your other device' : 'Up to date', { icon: 'sync', ms: 2000 }); } catch (e) { toast(e.message, { tone: e.kind === 'offline' ? 'warn' : 'bad', ms: 6000 }); } },
   'now-go': (el) => { const W = whatNow(model(), nowMin()), it = [W.top].concat(W.also).find((x) => x.id === el.dataset.id); if (it) runNow(it); },
   'rev-focus': (el) => { const M = model(), x = M.revq.byId[el.dataset.id]; if (x) runNow(revisionItem(M, x, +(M.st.timer || {}).pomodoro || 25)); },
@@ -172,6 +179,15 @@ function deepAction() {
   GLOBAL[m[1]]();
 }
 
+// Piyush on Finance appears on 13 Jan: the goal is created (store.releaseCheck) and each device says so once
+function checkRelease() {
+  store.releaseCheck();
+  if (contentOn(todayStr()) && !store.S.meta.contentSeen) {
+    store.setMeta('contentSeen', true, true);
+    toast('Piyush on Finance is live. Your new goal and upload tracker are in Goals.', { icon: 'video', ms: 9000, action: { label: 'Open', fn: () => go('#/goals') } });
+  }
+}
+
 // ---------- boot ----------
 async function boot() {
   applyTheme();
@@ -185,6 +201,7 @@ async function boot() {
   await onRoute();
   deepAction();
   focus.resume();   // a deep focus session survives a reload
+  checkRelease();
   celebrate();
   document.body.classList.add('ready');
   if (kind === 'memory') { $('#banner').innerHTML = '<div class="banner" role="alert">This browser is blocking storage, so changes won’t survive a reload. Download a backup from Tools before closing.</div>'; }
@@ -208,8 +225,8 @@ async function boot() {
   widgets.refresh();
   const remind = () => { widgets.refresh(); pwa.checkReminder(() => openQuickLog()).catch((e) => console.warn('[reminder]', e)); };
   let day = todayStr();
-  setInterval(() => { if (todayStr() !== day) { day = todayStr(); render('update'); } remind(); }, 30000);
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (todayStr() !== day) { day = todayStr(); render('update'); } remind(); } });
+  setInterval(() => { if (todayStr() !== day) { day = todayStr(); checkRelease(); render('update'); } remind(); }, 30000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (todayStr() !== day) { day = todayStr(); checkRelease(); render('update'); } remind(); } });
   setTimeout(remind, 2500);
   window.addEventListener('resize', debounce(() => { drawAll($('#main'), false); layoutTabs(); }, 150));
   const onScroll = () => document.body.classList.toggle('scrolled', window.scrollY > 8);

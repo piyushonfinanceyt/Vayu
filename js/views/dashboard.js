@@ -15,6 +15,7 @@ import { promptWeek } from '../weekly.js';
 import { whatNow } from '../whatnow.js';
 import { hoursCheck } from '../hours.js';
 import * as sync from '../sync.js';
+import { contentCard } from './insights.js';
 
 const STATUS_TONE = { ahead: 'good', ontrack: 'good', done: 'good', behind: 'warn', overdue: 'bad', upcoming: '', nodata: '' };
 
@@ -243,6 +244,7 @@ export default {
       <div class="grid dash-r2"><div class="meters span-8">${targetMeters(M)}</div>${nextUp(M, B)}</div>
       <div class="grid dash-r3">${planCard(M)}${logCard(M)}${runCard(M)}</div>
       ${kpiRow(M)}
+      ${contentCard(M)}
       <div class="grid">${arcCard(M)}${milestonesCard(M)}</div>`;
   },
   actions: {

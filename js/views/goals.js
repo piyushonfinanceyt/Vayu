@@ -6,6 +6,7 @@ import { card, chip, status, tile, tabs, meter, empty, toast, menu, form, confir
 import { pref, setPref } from '../prefs.js';
 import { renderSoon } from '../router.js';
 import * as store from '../store.js';
+import { contentCard } from './insights.js';
 
 const TASK_CATS = ['Accounts', 'Law', 'Tax', 'Costing', 'Audit', 'FM&SM', 'Revision', 'Mock test', 'Health', 'Communication', 'Career', 'Finance', 'Content', 'Personal', 'Other'];
 const MS_TYPES = ['Exam', 'Study', 'Revision', 'Mock test', 'Application', 'Career', 'Articleship', 'Personal', 'Financial', 'Fitness', 'Other'];
@@ -91,7 +92,7 @@ function goalsTab(M) {
   const g = M.goals, c = (s) => g.filter((x) => x.status === s).length, cat = pref('goalsCat', 'All');
   const list = g.filter((x) => cat === 'All' || x.category === cat);
   const tiles = html`<div class="tiles">${tile({ cls: 'hero', label: 'Goals', icon: 'target', value: String(g.length), foot: c('done') + ' completed · ' + c('paused') + ' paused' })}${tile({ label: 'Ahead or on track', icon: 'arrowU', value: String(c('ahead') + c('ontrack')), foot: 'of ' + g.filter((x) => x.hasData && !['done', 'paused', 'upcoming'].includes(x.status)).length + ' in progress' })}${tile({ label: 'Behind', icon: 'arrowD', value: String(c('behind') + c('overdue')), foot: M.analytics.goalRisk.filter((x) => x.risk === 'high').length + ' at high risk' })}${tile({ label: 'Average progress', icon: 'analytics', value: M.analytics.goalCompletion == null ? '—' : Math.round(M.analytics.goalCompletion) + '%', foot: 'active goals with data' })}</div>`;
-  return html`${tiles}${card({
+  return html`${tiles}${contentCard(M)}${card({
     title: 'Your goals', icon: 'target', sub: 'Linked goals update from your logs. The tick on each bar is where you’re expected to be today.',
     actions: html`<div class="seg" role="group" aria-label="Category">${['All'].concat(M.goalCats).map((x) => html`<button type="button" data-seg="goals-cat" data-v="${x}" aria-pressed="${String(cat === x)}">${x === 'All' ? 'All' : x}</button>`)}</div><button type="button" class="btn sm primary" data-act="goal-add">${icon('plus')}Add goal</button>`,
     body: list.length ? html`<ul class="goals">${list.map((x) => goalRow(M, x))}</ul>` : empty('No goals in this category yet.', html`<button type="button" class="btn sm" data-act="goal-add">${icon('plus')}Add a goal</button>`, 'target')

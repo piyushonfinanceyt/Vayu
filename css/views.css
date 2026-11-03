@@ -692,3 +692,17 @@ body.focus-on { overflow: hidden; }
 .hc-sync a { color: var(--ink-2); text-underline-offset: 3px; }
 .hc-sync.bad { color: var(--bad); }
 .hc-sync.bad a { color: var(--bad); }
+
+/* ================= Piyush on Finance (from 13 Jan) ================= */
+.content-card { margin-bottom: 14px; }
+.ct-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.ct-tile { background: var(--soft); border-radius: var(--r-md); padding: 12px 14px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.ct-tile .lbl { display: flex; align-items: center; gap: 7px; }
+.ct-tile .lbl svg { width: 14px; height: 14px; }
+.ct-tile b { font-size: 26px; font-weight: 500; letter-spacing: -.02em; }
+.ct-tile b small { font-size: 13px; color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
+.ct-tile > small { color: var(--ink-3); font-size: 12px; }
+.ct-tile .chip { justify-self: start; }
+.ct-list li { display: flex; align-items: center; gap: 8px; }
+.ct-list .li-main { flex: 1 1 auto; min-width: 0; }
+@media (max-width: 700px) { .ct-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ct-tiles > :last-child { grid-column: 1 / -1; } .ct-list li { flex-wrap: wrap; } }

@@ -4,6 +4,7 @@ import { html, fmt1, fmtD, fmtDS, sortBy, typeName, plural } from '../util.js';
 import { card, chip, status, empty } from '../components.js';
 import { icon } from '../icons.js';
 import { spot, bullet } from '../charts.js';
+import { PLATFORMS } from '../content.js';
 
 const P = (n) => Math.round(n * 100);
 const SHORT_PHASE = ['Old plan · A + L', 'Old plan · rest', 'R1 · 2 papers/wk', 'R2 · 3/wk', 'Daily papers', 'Fix-it', 'Final look', 'Exams'];
@@ -100,5 +101,30 @@ export function leakCard(M, o = {}) {
         <span class="lm-main"><b><i class="dot" style="--c:${w.c}"></i>${w.code} ${r.c ? '#' + r.c.id + ' ' : ''}${r.name}</b><span class="hbar" role="img" aria-label="${'Risk score ' + r.score}"><i class="${i === 0 ? 'on' : ''}" style="width:${Math.max(4, r.score / top * 100).toFixed(1)}%"></i></span><small>${r.why.join(' · ')}</small></span>
         <button type="button" class="btn sm" data-act="focus" data-subject="${r.subject}" data-chapter="${r.c && r.c.status !== 'done' ? r.c.id : ''}" aria-label="${'Deep focus on ' + r.name}">${icon('target')}Fix</button></li>`; })}</ol>`
       : empty('No leaks yet. They appear as you log mistakes, write papers and reach deadlines.', '', 'checkCircle')
+  });
+}
+
+// ---------- Piyush on Finance: uploads against the weekly targets (content.js); null until 13 Jan ----------
+export function contentCard(M, o = {}) {
+  const C = M.content;
+  if (!C) return '';
+  const ago = (n) => (n === 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago');
+  const tile = (p) => {
+    const s = C.platforms[p], P = PLATFORMS[p];
+    const st = !s.target ? chip('No target') : s.done ? status('Done this week', 'good') : s.late ? status('Still due', 'warn') : chip('Due by Sunday');
+    return html`<div class="ct-tile"><span class="lbl"><i class="dot" style="--c:${P.c}"></i>${P.name}</span><b>${s.count}<small> of ${s.target} this week</small></b>${st}<small>${s.last ? 'Last ' + P.noun + ' ' + ago(s.since) : 'No ' + P.noun + ' logged yet'}</small></div>`;
+  };
+  const row = (x) => {
+    const P = PLATFORMS[x.platform], up = !!x.uploadedOn;
+    const what = up ? 'Uploaded ' + fmtD(x.uploadedOn) : x.state === 'missed' ? 'Was planned for ' + fmtD(x.plannedFor) : x.state === 'today' ? 'Planned for today' : x.plannedFor ? 'Planned · ' + fmtD(x.plannedFor) : 'Idea';
+    return html`<li class="ct-row"><span class="li-main"><b><i class="dot" style="--c:${P.c};margin-right:8px"></i>${x.title || P.name + ' ' + P.noun}</b><small>${P.name} · ${what}${x.link ? html` · <a href="${x.link}" target="_blank" rel="noopener">Open</a>` : ''}</small></span>
+      ${up ? '' : html`${x.state === 'missed' ? status('Missed', 'bad') : ''}<button type="button" class="btn sm" data-act="ct-up" data-id="${x.id}">${icon('check')}Uploaded</button>`}<button type="button" class="icon-btn sm" data-act="ct-edit" data-id="${x.id}" aria-label="Edit this ${P.noun}">${icon('edit')}</button></li>`;
+  };
+  const rows = C.planned.concat(C.recent);
+  return card({
+    cls: 'content-card ' + (o.cls || ''), id: 'content-panel', title: 'Piyush on Finance', icon: 'video', sub: 'Your YouTube channel and Instagram page · week of ' + fmtDS(C.week),
+    actions: html`<button type="button" class="btn sm primary" data-act="ct-log">${icon('plus')}Log an upload</button><button type="button" class="btn sm" data-act="ct-plan">${icon('calendar')}Plan one</button><button type="button" class="icon-btn sm" data-act="ct-targets" aria-label="Weekly targets" title="Weekly targets">${icon('settings')}</button>`,
+    body: html`<div class="ct-tiles">${tile('youtube')}${tile('instagram')}<div class="ct-tile"><span class="lbl">${icon('flame')}Weeks on target</span><b>${C.streak}</b><small>${C.streak ? 'Every target met, ' + plural(C.streak, 'week') + ' in a row' : 'Hit both targets in one week to start a streak'}</small></div></div>
+      ${rows.length ? html`<h3 class="sub-h">Planned and uploaded</h3><ul class="list ct-list">${rows.map(row)}</ul>` : html`<p class="muted small" style="margin-top:12px">Nothing logged yet. Tap Log an upload when a video or post goes live, or Plan one to keep track of what's coming.</p>`}`
   });
 }

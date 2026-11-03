@@ -14,6 +14,7 @@ import { errDue } from './drill.js';
 import { revisionQueue } from './revise.js';
 import { errorTally, leakyIds, leakMap } from './leaks.js';
 import { pref } from './prefs.js';
+import { contentOn, contentStats, PLATFORMS } from './content.js';
 import { diff, addDays, mondayOf, sum, clamp, clamp01, fmt1, fmtN, fmtD, fmtDS, mmss, plural, sortBy, todayStr, parseHours, timeToMin, now } from './util.js';
 
 export const WORLDS = [
@@ -30,7 +31,7 @@ const EXAM_DAY = { 1: '2027-01-02', 2: '2027-01-04', 3: '2027-01-06', 4: '2027-0
 export const GOAL_SOURCES = {
   manual: 'Set the % yourself', readiness: 'Average of syllabus, revision, mocks and hours', syllabus: 'Chapters completed',
   hours: 'Study hours vs plan', revision: 'R2 + R3 revision ticks', mocks: 'Full mocks taken', run: '2 km time-trial progress',
-  run5k: '5 km in 30:00 · best run as % of 5 km at 6:00 /km', tasks: 'Linked tasks completed'
+  run5k: '5 km in 30:00 · best run as % of 5 km at 6:00 /km', tasks: 'Linked tasks completed', content: 'Videos and posts uploaded against your weekly targets'
 };
 export const AREA_SOURCES = { manual: 'Your check-ins', 'auto:syllabus': 'Chapters completed (auto)', 'auto:health': 'Workout, steps, push-ups and meals (auto)', 'auto:run': '2 km time-trial progress (auto)', 'auto:run5k': '5 km in 30:00 progress (auto)' };
 export const STATUS_TXT = { done: 'Completed', ahead: 'Ahead', ontrack: 'On track', behind: 'Behind', overdue: 'Overdue', upcoming: 'Not started', nodata: 'No data yet', paused: 'Paused' };
@@ -533,6 +534,7 @@ function computeAll() {
     const start = g.startDate || st.planStart, deadline = g.deadline || st.yearEnd;
     if (src === 'manual') actual = +g.progress || 0;
     else if (src === 'tasks') { const linked = tasks.filter((x) => x.goalId === g.id); actual = linked.length ? 100 * linked.filter((x) => x.done).length / linked.length : 0; detail = linked.filter((x) => x.done).length + ' / ' + linked.length + ' tasks'; hasData = linked.length > 0; }
+    else if (src === 'content') { const C = contentStats(store.list('content'), st, t, { start, deadline }); actual = C.pct; detail = C.goalDone + ' of ' + C.goalTarget + ' uploads · ' + C.streak + (C.streak === 1 ? ' week' : ' weeks') + ' on target'; }
     else if (/^lifeArea:/.test(src)) { const a = M.areaById[src.slice(9)]; if (a && a.hasData) { actual = a.latest.value; expected = a.expected; model = 'area'; } else hasData = false; }
     else if (F[src]) {
       actual = 100 * F[src](t);
@@ -638,6 +640,7 @@ function computeAll() {
   M.revq = revisionQueue(chapters, t, st.revisionStart || '2026-11-18', leakyIds(leakTally));
   M.leaks = leakMap(chapters, M.outlook, leakTally, M.revq);
   M.cardsDue = store.list('cards').filter((c) => errDue(c, t)).length;
+  M.content = contentOn(t) ? contentStats(store.list('content'), st, t) : null;   // null until 13 Jan: the channel panel stays hidden
 
   // ---------- milestones ----------
   const tt1 = runs.find((r) => r.isTT);
@@ -689,6 +692,11 @@ function computeAll() {
   const errDueN = store.list('errors').filter((e) => errDue(e, t)).length;
   if (errDueN) notes.push({ id: 'errors', icon: 'revision', tone: 'info', title: plural(errDueN, 'mistake') + ' due for review', body: 'Drill them · about a minute each', href: '#/errors?drill=1' });
   if (M.revq.today.length) notes.push({ id: 'revision', icon: 'revision', tone: 'info', title: plural(M.revq.today.length, 'chapter') + ' to revise today', body: M.revq.waiting ? M.revq.waiting + ' more waiting after these' : 'Spaced revision · R2 and R3', href: '#/revision' });
+  // Piyush on Finance (only exists from 13 Jan): what's planned for today, and a target still open late in the week
+  if (M.content) {
+    M.content.planned.filter((x) => x.state === 'today').forEach((x) => notes.push({ id: 'ct-' + x.id, icon: PLATFORMS[x.platform].icon, tone: 'info', title: 'Planned for today · ' + (x.title || PLATFORMS[x.platform].name), body: PLATFORMS[x.platform].name + ' · mark it uploaded when it’s out', href: '#/goals' }));
+    Object.keys(PLATFORMS).forEach((p) => { const s = M.content.platforms[p]; if (s.late && s.target) notes.push({ id: 'ct-late-' + p, icon: PLATFORMS[p].icon, tone: 'warn', title: PLATFORMS[p].name + ': ' + (s.count ? s.count + ' of ' + s.target : 'no') + ' ' + PLATFORMS[p].noun + (s.target === 1 && !s.count ? '' : 's') + ' this week', body: 'Your target is ' + s.target + ' a week, counted to Sunday', href: '#/goals' }); });
+  }
   if (M.cardsDue) notes.push({ id: 'cards', icon: 'zap', tone: 'info', title: plural(M.cardsDue, 'flashcard') + ' due', body: 'Drill them · a few seconds each', href: '#/revision?drill=1' });
   // Sunday evening: the week in review (until it's opened)
   if (new Date(t + 'T12:00:00').getDay() === 0 && new Date().getHours() >= 17 && pref('reviewSeen') !== mondayOf(t)) notes.push({ id: 'review', icon: 'analytics', tone: 'info', title: 'Your week in review is ready', body: 'Hours, chapters, papers and one focus for next week', href: '#/analytics?review=1' });
