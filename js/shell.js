@@ -3,37 +3,56 @@
 import { html, raw, esc, $, $$, plural, fmtDS, todayStr, diff, now } from './util.js';
 import { icon } from './icons.js';
 import { menu, modal } from './components.js';
-import { resolvedTheme } from './prefs.js';
+import { resolvedTheme, pref } from './prefs.js';
 import * as store from './store.js';
 import * as sync from './sync.js';
 import { errDue } from './drill.js';
 
 export const ROUTES = [
-  { id: 'dashboard', title: 'Dashboard', icon: 'dashboard', group: 1 },
-  { id: 'goals', title: 'Goals', icon: 'target', group: 1, sub: 'Goals, milestones and tasks' },
-  { id: 'study-plan', title: 'Study Plan', icon: 'calcheck', group: 1, sub: 'All 110 days of the plan, one at a time' },
-  { id: 'log', title: 'Daily Log', icon: 'logbook', group: 1, sub: 'Your 10 PM log, quick entries through the day and recent history' },
-  { id: 'subjects', title: 'Subjects', icon: 'book', group: 1, sub: '105 chapters across the six papers' },
-  { id: 'revision', title: 'Revision', icon: 'revision', group: 1, sub: 'R2 and R3 coverage and what to revise next' },
-  { id: 'mocks', title: 'Mock Tests', icon: 'mocks', group: 1, sub: '27 full papers, written by hand · all done by 19 Dec' },
-  { id: 'errors', title: 'Error Book', icon: 'alert', group: 1, sub: 'Every lost mark by paper and error type · review 20 minutes a day' },
-  { id: 'notes', title: 'Notes', icon: 'notes', group: 1, examHide: true, sub: 'Notes and your formula sheet' },
-  { id: 'habits', title: 'Habit Tracker', icon: 'habits', group: 1, examHide: true, sub: 'Daily habits, streaks and completion' },
-  { id: 'journal', title: 'Journal', icon: 'journal', group: 2, sub: 'Mood, reflections and voice notes · one page a day' },
-  { id: 'finance', title: 'Finance', icon: 'finance', group: 2, sub: 'Income, spending and savings' },
-  { id: 'health', title: 'Health & Lifestyle', icon: 'health', group: 2, sub: 'Running, workouts, steps, push-ups and the Winter Arc' },
-  { id: 'run-5k', title: '5K Run', icon: 'activity', group: 2, sub: '5 km in 30:00 on 28 Nov · plan, run log and progress' },
-  { id: 'winter-arc', title: 'Winter Arc', icon: 'snow', group: 2, sub: 'Your 92-day challenge, levels, ranks and badges' },
-  { id: 'resources', title: 'Resources', icon: 'folder', group: 2, sub: 'Links, books and study material' },
-  { id: 'calendar', title: 'Calendar', icon: 'calendar', group: 2, sub: 'Everything on your timeline' },
-  { id: 'analytics', title: 'Analytics', icon: 'analytics', group: 3, sub: 'Readiness, trends and consistency' },
-  { id: 'tools', title: 'Tools', icon: 'tools', group: 3, sub: 'Focus timer, backup and restore' },
-  { id: 'settings', title: 'Settings', icon: 'settings', group: 3, sub: 'Theme, profile, plan targets and XP rules' }
+  { id: 'dashboard', title: 'Dashboard', short: 'Home', icon: 'dashboard', bb: 'home', group: 1 },
+  { id: 'goals', title: 'Goals', short: 'Goals', icon: 'target', group: 1, sub: 'Goals, milestones and tasks' },
+  { id: 'study-plan', title: 'Study Plan', short: 'Plan', icon: 'calcheck', group: 1, sub: 'All 110 days of the plan, one at a time' },
+  { id: 'log', title: 'Daily Log', short: 'Log', icon: 'logbook', group: 1, sub: 'Your 10 PM log, quick entries through the day and recent history' },
+  { id: 'subjects', title: 'Subjects', short: 'Subjects', icon: 'book', group: 1, sub: '105 chapters across the six papers' },
+  { id: 'revision', title: 'Revision', short: 'Revision', icon: 'revision', group: 1, sub: 'R2 and R3 coverage and what to revise next' },
+  { id: 'mocks', title: 'Mock Tests', short: 'Mocks', icon: 'mocks', group: 1, sub: '27 full papers, written by hand · all done by 19 Dec' },
+  { id: 'errors', title: 'Error Book', short: 'Errors', icon: 'alert', group: 1, sub: 'Every lost mark by paper and error type · review 20 minutes a day' },
+  { id: 'notes', title: 'Notes', short: 'Notes', icon: 'notes', group: 1, examHide: true, sub: 'Notes and your formula sheet' },
+  { id: 'habits', title: 'Habit Tracker', short: 'Habits', icon: 'habits', group: 1, examHide: true, sub: 'Daily habits, streaks and completion' },
+  { id: 'journal', title: 'Journal', short: 'Journal', icon: 'journal', group: 2, sub: 'Mood, reflections and voice notes · one page a day' },
+  { id: 'finance', title: 'Finance', short: 'Finance', icon: 'finance', group: 2, sub: 'Income, spending and savings' },
+  { id: 'health', title: 'Health & Lifestyle', short: 'Health', icon: 'health', group: 2, sub: 'Running, workouts, steps, push-ups and the Winter Arc' },
+  { id: 'run-5k', title: '5K Run', short: '5K', icon: 'activity', group: 2, sub: '5 km in 30:00 on 28 Nov · plan, run log and progress' },
+  { id: 'winter-arc', title: 'Winter Arc', short: 'Arc', icon: 'snow', group: 2, sub: 'Your 92-day challenge, levels, ranks and badges' },
+  { id: 'resources', title: 'Resources', short: 'Library', icon: 'folder', group: 2, sub: 'Links, books and study material' },
+  { id: 'calendar', title: 'Calendar', short: 'Calendar', icon: 'calendar', group: 2, sub: 'Everything on your timeline' },
+  { id: 'analytics', title: 'Analytics', short: 'Analytics', icon: 'analytics', group: 3, sub: 'Readiness, trends and consistency' },
+  { id: 'tools', title: 'Tools', short: 'Tools', icon: 'tools', group: 3, sub: 'Focus timer, backup and restore' },
+  { id: 'settings', title: 'Settings', short: 'Settings', icon: 'settings', group: 3, sub: 'Theme, profile, plan targets and XP rules' }
 ];
 export const routeById = (id) => ROUTES.find((r) => r.id === id) || ROUTES[0];
 const examOn = () => { const st = store.settings(); return !!st.examMode && todayStr() <= (st.examModeEnd || '2027-01-12'); };
 export { errDue };
-const inPill = (r) => r.group === 1 && !(examOn() && r.examHide);
+
+// ---------- your navigation (Settings → Navigation, saved on this device) ----------
+// the computer's top tabs, in order (the rest are in More), and the phone's four bottom-bar shortcuts
+const VALID = (id) => ROUTES.some((r) => r.id === id);
+export const DEFAULT_TABS = ROUTES.filter((r) => r.group === 1).map((r) => r.id);
+export const DEFAULT_BAR = ['dashboard', 'study-plan', 'mocks', 'revision'];
+export function navTabs() {
+  const t = (pref('navTabs') || []).filter((id, i, a) => VALID(id) && a.indexOf(id) === i);
+  return t.length ? t : DEFAULT_TABS.slice();
+}
+export function navBar() {
+  const b = (pref('navBar') || []).filter((id, i, a) => VALID(id) && a.indexOf(id) === i);
+  return b.length === 4 ? b : DEFAULT_BAR.slice();
+}
+const pillRoutes = () => navTabs().map(routeById).filter((r) => !(examOn() && r.examHide));
+// the order pages slide in: the phone's bar or the computer's tabs first, then everything else
+export function navOrder() {
+  const first = matchMedia('(max-width: 767px)').matches ? navBar() : navTabs();
+  return first.concat(ROUTES.map((r) => r.id).filter((id) => !first.includes(id)));
+}
 
 // Vayu: a V with arms raised in flight and a dot riding the wind above its right arm
 const BRAND = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 6l5.6 12 5.6-12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="19.7" cy="4.9" r="1.8" fill="currentColor"/></svg>';
@@ -44,22 +63,22 @@ export function buildShell() {
   $('#brand-mark').innerHTML = BRAND;
   const tabs = $('#tabs');
   tabs.innerHTML = '<span class="tab-ind" aria-hidden="true"></span>' +
-    ROUTES.filter(inPill).map((r) => '<a class="tab" href="#/' + r.id + '" data-route="' + r.id + '">' + esc(r.title) + '<span class="count" data-count-for="' + r.id + '" hidden></span></a>').join('') +
+    pillRoutes().map((r) => '<a class="tab" href="#/' + r.id + '" data-route="' + r.id + '">' + esc(r.title) + '<span class="count" data-count-for="' + r.id + '" hidden></span></a>').join('') +
     '<button type="button" class="tab more" data-act="more" aria-haspopup="menu" aria-expanded="false">More' + icon('chevD') + '</button>';
   $('#dock').innerHTML =
     '<button type="button" data-act="palette" data-tip="Search · Ctrl K" aria-label="Search and commands (Ctrl K)">' + icon('search') + '</button>' +
-    '<button type="button" data-act="quicklog" data-tip="Quick log · L" aria-label="Quick log (L)">' + icon('plus') + '</button>' +
+    '<button type="button" data-act="quicklog" data-hold="quick" data-tip="Quick log · L · right-click for more" aria-label="Quick log (L). Right-click or hold for more quick actions">' + icon('plus') + '</button>' +
     '<button type="button" data-act="timer" data-tip="Focus timer" aria-label="Focus timer" id="dock-timer">' + icon('timer') + '</button>' +
     '<button type="button" data-act="go-errors" data-tip="Error Book" aria-label="Error Book" id="dock-errors">' + icon('alert') + '</button>' +
     '<hr>' +
     '<button type="button" data-act="theme" data-tip="Theme · T" aria-label="Switch theme (T)" id="dock-theme"></button>';
-  $('#bottombar').innerHTML =
-    bb('dashboard', 'Home', 'home') + bb('study-plan', 'Plan', 'calcheck') +
-    '<button type="button" class="bb-add" data-act="quicklog" aria-label="Quick log">' + icon('plus') + '</button>' +
-    bb('mocks', 'Mocks', 'mocks') +
+  const B = navBar();
+  $('#bottombar').innerHTML = bb(B[0]) + bb(B[1]) +
+    '<button type="button" class="bb-add" data-act="quicklog" data-hold="quick" aria-label="Quick log. Press and hold for more quick actions">' + icon('plus') + '</button>' +
+    bb(B[2]) + bb(B[3]) +
     '<button type="button" class="bb-item" data-act="more-sheet" aria-label="All sections">' + icon('menu') + '<span>More</span></button>';
 }
-const bb = (id, label, ic) => '<a class="bb-item" href="#/' + id + '" data-route="' + id + '">' + icon(ic) + '<span>' + label + '</span></a>';
+const bb = (id) => { const r = routeById(id); return '<a class="bb-item" href="#/' + r.id + '" data-route="' + r.id + '"><span class="bb-ic">' + icon(r.bb || r.icon) + '<span class="bb-n" data-count-for="' + r.id + '" hidden></span></span><span>' + esc(r.short || r.title) + '</span></a>'; };
 
 let lastRoute = 'dashboard';
 export function updateShell(M, routeId) {
@@ -67,10 +86,12 @@ export function updateShell(M, routeId) {
   if (examOn() !== builtExam) buildShell();   // exam mode moved tabs between the bar and More
   $$('[data-route]').forEach((a) => { const on = a.dataset.route === routeId; if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   const more = $('#tabs .more');
-  const inMore = !ROUTES.filter(inPill).some((r) => r.id === routeId) || ($('#tabs [data-route="' + routeId + '"]') || {}).classList?.contains('is-overflow');
+  const inMore = !pillRoutes().some((r) => r.id === routeId) || ($('#tabs [data-route="' + routeId + '"]') || {}).classList?.contains('is-overflow');
   if (more) { if (inMore) more.setAttribute('aria-current', 'page'); else more.removeAttribute('aria-current'); }
-  // counts on tabs: overdue chapters, mocks waiting for marks, mistakes due
-  const setCount = (id, n) => { const el = $('[data-count-for="' + id + '"]'); if (el) { el.hidden = !n; el.textContent = n || ''; } };
+  const bm = $('#bottombar [data-act="more-sheet"]');
+  if (bm) { if (navBar().includes(routeId)) bm.removeAttribute('aria-current'); else bm.setAttribute('aria-current', 'page'); }
+  // counts on tabs and bottom-bar shortcuts: overdue chapters, mocks waiting for marks, mistakes due
+  const setCount = (id, n) => $$('[data-count-for="' + id + '"]').forEach((el) => { el.hidden = !n; el.textContent = n > 99 ? '99+' : n || ''; });
   setCount('subjects', M.overdueCount);
   setCount('mocks', M.mocks.filter((m) => m.status === 'missed' || (m.status === 'today')).length);
   const due = store.list('errors').filter((e) => errDue(e, M.t)).length;
@@ -114,12 +135,24 @@ export function placeIndicator() {
 }
 
 // ---------- menus ----------
+// everything not showing in the top bar: tabs you left out, tabs that don't fit at this width, exam-mode tabs
 export function moreMenu(anchor) {
-  const over = $$('#tabs .tab.is-overflow').map((t) => routeById(t.dataset.route));
-  const exam = ROUTES.filter((r) => r.group === 1 && examOn() && r.examHide);
+  const shown = $$('#tabs .tab[data-route]:not(.is-overflow)').map((t) => t.dataset.route);
+  const rest = ROUTES.filter((r) => !shown.includes(r.id));
   const sec = (title, list) => list.length ? '<section><h4>' + esc(title) + '</h4>' + list.map((r) => '<a class="mi" href="#/' + r.id + '"' + (r.id === lastRoute ? ' aria-current="page"' : '') + '>' + icon(r.icon) + '<span class="grow">' + esc(r.title) + '</span></a>').join('') + '</section>' : '';
-  const g1 = over.concat(exam);
-  menu(anchor, [], { cls: 'more-pop', align: 'end', html: '<div class="more-grid">' + sec('Study', g1) + sec('Life', ROUTES.filter((r) => r.group === 2)) + sec('Insight and system', ROUTES.filter((r) => r.group === 3)) + '</div>' });
+  menu(anchor, [], { cls: 'more-pop', align: 'end', html: '<div class="more-grid">' + sec('Study', rest.filter((r) => r.group === 1)) + sec('Life', rest.filter((r) => r.group === 2)) + sec('Insight and system', rest.filter((r) => r.group === 3)) + '</div>' });
+}
+// hold the + (or right-click it): the quick actions
+export function quickMenu(anchor, acts) {
+  menu(anchor, [
+    { heading: 'Quick actions' },
+    { label: 'What now?', hint: 'The best thing to do right now', icon: 'zap', fn: acts.now },
+    { label: 'Fill in the 10 PM log', hint: 'Quick log', icon: 'logbook', fn: acts.log },
+    { label: 'Start deep focus', hint: 'One paper, one chapter or general', icon: 'target', fn: acts.focus },
+    { label: 'Enter mock marks', hint: 'Mock Tests', icon: 'mocks', fn: acts.marks },
+    { label: 'Log a lost mark', hint: 'Error Book', icon: 'alert', fn: acts.mistake },
+    { label: 'Make a flashcard', hint: 'Revision', icon: 'bookmark', fn: acts.card }
+  ], { cls: 'quick-pop', align: 'end' });
 }
 export function moreSheet(actions) {
   const sheet = document.createElement('div');

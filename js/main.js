@@ -6,9 +6,11 @@ import { model } from './model.js';
 import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now, nowMin } from './util.js';
 import { toast, menu, closeMenu, menuOpen, modalOpen } from './components.js';
 import { drawAll } from './charts.js';
-import { applyTheme, setTheme, resolvedTheme, onSystemTheme, setOpen, setPref } from './prefs.js';
+import { applyTheme, setTheme, resolvedTheme, onSystemTheme, setOpen, setPref, pref } from './prefs.js';
 import { openReview, promptWeek } from './weekly.js';
-import { buildShell, layoutTabs, placeIndicator, moreMenu, moreSheet, notifications, profileMenu, shortcutsHelp } from './shell.js';
+import { buildShell, layoutTabs, placeIndicator, moreMenu, moreSheet, notifications, profileMenu, shortcutsHelp, quickMenu } from './shell.js';
+import { openCustomise } from './dashlayout.js';
+import { openCardForm } from './cards.js';
 import { onRoute, render, renderSoon, currentView, current, go, prefetch } from './router.js';
 import { openPalette, isOpen as paletteOpen } from './palette.js';
 import { open as openQuickLog } from './quicklog.js';
@@ -66,8 +68,30 @@ export const GLOBAL = {
   'task-toggle': (el) => { const t = store.get('tasks', el.dataset.id); if (t) store.patch('tasks', t.id, { done: !t.done, doneAt: !t.done ? todayStr() : null }); },
   welcome: () => store.setMeta('welcomeDismissed', true),
   review: () => { openReview(model()); renderSoon(); },
-  'review-later': () => { setPref('reviewSeen', promptWeek(todayStr())); renderSoon(); }
+  'review-later': () => { setPref('reviewSeen', promptWeek(todayStr())); renderSoon(); },
+  'dash-customise': () => openCustomise(() => renderSoon())
 };
+
+// ---------- hold the + (bottom bar, dock) for the quick actions; a plain tap still opens the quick log ----------
+const QUICK = {
+  now: () => runNow(whatNow(model(), nowMin()).top),
+  log: () => openQuickLog(),
+  focus: () => focus.openSetup(),
+  marks: () => go('#/mocks'),
+  mistake: () => go('#/errors?add=1'),
+  card: () => openCardForm(null, {})
+};
+let holdT = 0, held = false, holdAt = null;
+const openQuick = (b) => { held = true; clearTimeout(holdT); try { if (navigator.vibrate) navigator.vibrate(10); } catch (x) { /* no vibration */ } quickMenu(b, QUICK); };
+document.addEventListener('pointerdown', (e) => {
+  held = false; clearTimeout(holdT);
+  const b = e.target.closest('[data-hold]'); if (!b || e.button > 0) return;
+  holdAt = [e.clientX, e.clientY];
+  holdT = setTimeout(() => openQuick(b), 450);
+});
+document.addEventListener('pointermove', (e) => { if (holdAt && Math.hypot(e.clientX - holdAt[0], e.clientY - holdAt[1]) > 12) clearTimeout(holdT); }, { passive: true });
+['pointerup', 'pointercancel'].forEach((ev) => document.addEventListener(ev, () => { clearTimeout(holdT); holdAt = null; }));
+document.addEventListener('contextmenu', (e) => { const b = e.target.closest('[data-hold]'); if (!b) return; e.preventDefault(); if (!held) openQuick(b); });
 function dispatch(name, el, e) {
   const v = currentView(), fn = (v && v.actions && v.actions[name]) || GLOBAL[name];
   if (fn) { e.preventDefault(); fn(el, e); return true; }
@@ -102,6 +126,7 @@ document.addEventListener('toggle', (e) => { const d = e.target; if (d && d.tagN
 document.addEventListener('click', (e) => {
   const t = e.target.closest('button, [data-act], [role="tab"]');
   if (!t || t.disabled || t.getAttribute('aria-disabled') === 'true') return;
+  if (t.dataset.hold && held) { held = false; e.preventDefault(); return; }   // the hold opened the quick actions
   if (t.dataset.step) {
     const inp = document.getElementById(t.dataset.for); if (!inp) return;
     const v = Math.max(0, Math.min(24, (parseFloat(inp.value) || 0) + parseFloat(t.dataset.step)));
@@ -187,6 +212,12 @@ function checkRelease() {
     toast('Piyush on Finance is live. Your new goal and upload tracker are in Goals.', { icon: 'video', ms: 9000, action: { label: 'Open', fn: () => go('#/goals') } });
   }
 }
+// once per device: what changed in getting around
+function navNews() {
+  if (pref('navNews')) return;
+  setPref('navNews', 1);
+  setTimeout(() => toast('New: section chips on long pages, your own shortcuts, and hold + for quick actions', { icon: 'sparkles', ms: 10000, action: { label: 'Set up', fn: () => go('#/settings?nav=1') } }), 1800);
+}
 
 // ---------- boot ----------
 async function boot() {
@@ -202,6 +233,7 @@ async function boot() {
   deepAction();
   focus.resume();   // a deep focus session survives a reload
   checkRelease();
+  navNews();
   celebrate();
   document.body.classList.add('ready');
   if (kind === 'memory') { $('#banner').innerHTML = '<div class="banner" role="alert">This browser is blocking storage, so changes won’t survive a reload. Download a backup from Tools before closing.</div>'; }

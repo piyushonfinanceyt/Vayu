@@ -1,8 +1,10 @@
-/* Dashboard · Option A, the Today cockpit. It answers "what do I do right now?"
-   Row 1: countdown to Paper 1 (hero) + today's timetable with a live "now" line.
-   Row 2: four target meters (hours, pages, steps, push-ups) + next up (hero).
-   Row 3: today's plan checklist · the 10 PM log prompt · today's / next run.
-   Row 4: syllabus, XP and rank (hero), streaks, this week · Winter Arc today · next milestones. */
+/* Dashboard, the Today cockpit. It answers "what do I do right now?"
+   On top, four key numbers: the countdown to Paper 1 (hero), R1 chapters against the plan, the pass outlook, this week.
+   Then three bands, each a jump-bar section:
+   Now: What now? and Next up, beside today's timetable with a live "now" line.
+   Today: the four target meters, today's plan, the 10 PM log, today's run, the Winter Arc habits.
+   Progress: Can I finish?, the next milestones, level, streak and badges (and Piyush on Finance from 13 Jan).
+   Customise hides cards and changes their order within a band (dashlayout.js, saved on this device). */
 import { html, raw, esc, fmt1, fmtN, fmtD, fmtDS, fmtDL, fmtLong, plural, mmss, pct, diff, addDays, mondayOf, nowMin, fmtClock, greeting, now, typeName, clamp01, todayStr } from '../util.js';
 import { icon } from '../icons.js';
 import { card, chip, status, ring, meter, empty, linkBtn, toast } from '../components.js';
@@ -16,23 +18,36 @@ import { whatNow } from '../whatnow.js';
 import { hoursCheck } from '../hours.js';
 import * as sync from '../sync.js';
 import { contentCard } from './insights.js';
+import { BANDS, bandCells, isShown } from '../dashlayout.js';
 
-const STATUS_TONE = { ahead: 'good', ontrack: 'good', done: 'good', behind: 'warn', overdue: 'bad', upcoming: '', nodata: '' };
-
-// ---------- row 1 ----------
-function countdown(M) {
+// ---------- the four key numbers ----------
+function summary(M) {
   const at = M.examAt, ms = Math.max(0, at - now()), s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
   const J = M.journey, st = M.st, syl = diff(M.t, st.syllabusDeadline), fin = diff(M.t, J.finish);
   const sylPos = clamp01(diff(J.start, st.syllabusDeadline) / J.days) * 100, finPos = clamp01(diff(J.start, J.finish) / J.days) * 100;
-  const unit = (k, v, l) => html`<span class="cd-u"><b data-cd="${k}">${k === 'd' ? String(v) : String(v).padStart(2, '0')}</b><small>${l}</small></span>`;
-  return html`<section class="card hero cd-card" aria-label="Countdown to Paper 1">
-    <div class="between"><span class="lbl">${icon('cap')} Paper 1 · Accounts</span><span class="chip">${fmtD(st.examDate)} · ${fmtClock(at.getHours() * 60 + at.getMinutes())}</span></div>
-    <div class="cd-big"><span class="value xl" data-count="${d}">${d}</span><span class="cd-days">days to go</span></div>
-    <div class="cd" role="timer" aria-label="${d} days, ${h} hours and ${m} minutes to Paper 1" data-cd-at="${at.getTime()}">${unit('h', h, 'hrs')}${unit('m', m, 'min')}${unit('s', sec, 'sec')}</div>
+  const two = (v) => String(v).padStart(2, '0');
+  const cd = html`<div class="tile hero ds-cd" role="group" aria-label="Countdown to Paper 1">
+    <span class="lbl ds-cd-top"><span class="row" style="gap:6px">${icon('cap')}Paper 1 · Accounts</span><span>${fmtD(st.examDate)} · ${fmtClock(at.getHours() * 60 + at.getMinutes())}</span></span>
+    <span class="ds-cd-main"><span class="value"><span data-count="${d}">${d}</span><small> ${d === 1 ? 'day' : 'days'} to go</small></span>
+      <span class="ds-clock num" role="timer" aria-label="${d} days, ${h} hours and ${m} minutes to Paper 1" data-cd-at="${at.getTime()}"><b data-cd="h">${two(h)}</b>h <b data-cd="m">${two(m)}</b>m <b data-cd="s">${two(sec)}</b>s</span></span>
     <div class="jtrack" role="img" aria-label="${J.num ? 'Day ' + J.num + ' of ' + J.days : 'Journey'}, ${Math.round(J.elapsed * 100)}% of the journey gone"><i style="width:${(J.elapsed * 100).toFixed(1)}%"></i><b style="left:${sylPos.toFixed(1)}%" title="R1 deadline"></b><b style="left:${finPos.toFixed(1)}%" title="Finish line"></b></div>
-    <div class="between small" style="margin-top:8px"><span>${J.num ? html`Day <b>${J.num}</b> of ${J.days}` : M.t < J.start ? 'Day 1 on ' + fmtDS(J.start) : 'Journey complete'}</span><span class="muted">${syl > 0 ? 'R1 deadline in ' + plural(syl, 'day') : syl === 0 ? 'R1 deadline today' : fin > 0 ? 'Finish line in ' + plural(fin, 'day') : 'Final look and exams'}</span></div>
-  </section>`;
+    <span class="tile-foot"><span>${J.num ? html`Day <b>${J.num}</b> of ${J.days}` : M.t < J.start ? 'Day 1 on ' + fmtDS(J.start) : 'Journey complete'}</span><span>${syl > 0 ? 'R1 deadline in ' + plural(syl, 'day') : syl === 0 ? 'R1 deadline today' : fin > 0 ? 'Finish line in ' + plural(fin, 'day') : 'Final look and exams'}</span></span></div>`;
+  const K = M.kpi, sylExp = M.EXP.syllabus(M.t) / 100, gap = K.syllabus.pct - sylExp, behind = Math.max(1, Math.round(-gap * K.syllabus.total));
+  const tone = gap >= 0 ? 'good' : gap >= -0.08 ? 'warn' : 'bad';
+  const r1 = html`<a class="tile" href="#/subjects"><span class="lbl">${icon('book')}R1 chapters</span><span class="value"><span data-count="${K.syllabus.done}">${K.syllabus.done}</span><small> / ${K.syllabus.total}</small></span>
+    ${meter(K.syllabus.pct, { thin: true, target: sylExp, targetLabel: 'expected by today', label: 'Chapters done against the plan' })}
+    <span class="tile-foot"><span class="tone ${tone}">${icon(gap >= 0 ? 'check' : 'alert')}${gap >= 0 ? 'On pace' : behind + ' behind plan'}</span></span></a>`;
+  const O = M.outlook, known = O.papers.filter((p) => p.seen), at40 = known.filter((p) => p.likely >= 40).length, w = O.weakest;
+  const pass = html`<a class="tile" href="#/mocks"><span class="lbl">${icon('gauge')}Will I pass?</span>
+    ${known.length ? html`<span class="value"><span data-count="${at40}">${at40}</span><small> / ${O.papers.length} at 40+</small></span>` : html`<span class="value">–</span>`}
+    <span class="tile-foot">${w ? html`<span class="tone ${w.low < 40 ? 'warn' : ''}">${icon(w.low < 40 ? 'alert' : 'info')}Weakest: ${w.code} · likely ${w.likely}</span>` : known.length ? html`<span class="tone good">${icon('check')}No paper below 40</span>` : html`<span>Enter mock marks to see it</span>`}</span></a>`;
+  const ws = mondayOf(M.t), wd = []; for (let i = 0; i < 7; i++) wd.push(addDays(ws, i));
+  const vals = wd.map((x) => (x <= M.t ? M.hoursOn(x) : null)), tgts = wd.map((x) => (M.dayByDate[x] ? M.dayByDate[x].target : 0));
+  const week = html`<a class="tile" href="#/analytics"><span class="lbl">${icon('clock')}This week</span><span class="value"><span data-count="${Math.round(K.week.hrs * 10) / 10}" data-dec="1">${fmt1(K.week.hrs)}</span><small> / ${fmt1(K.week.target)} h</small></span>
+    <span class="wk-bars ds-bars">${miniBars(vals, tgts, diff(ws, M.t), { w: 132, h: 28 })}</span>
+    <span class="tile-foot"><span>${K.week.delta >= 0 ? '+' : '−'}${fmt1(Math.abs(K.week.delta))} h vs last week</span></span></a>`;
+  return html`<div class="dsum">${cd}${r1}${pass}${week}</div>`;
 }
 
 function blockState(M) {
@@ -100,14 +115,15 @@ function syncLine() {
   const bad = sync.needsYou();
   return html`<p class="hc-sync ${bad ? 'bad' : ''}">${icon(bad ? 'alert' : 'sync')}<span data-sync-ago>${sync.statusText()}</span>${bad ? html`<a href="#/settings">Fix it</a>` : html`<button type="button" class="btn link" data-act="sync-refresh">Sync now</button>`}</p>`;
 }
-function whatNowCard(M) {
-  const W = whatNow(M, nowMin()), T = W.top;
+function whatNowCard(M, W) {
+  const T = W.top;
   return html`<section class="wn" aria-label="What now?"><span class="wn-ic">${icon(T.icon)}</span>
     <div class="wn-main"><span class="lbl">What now?</span><b>${T.title}</b><small>${T.why}</small></div>
     ${T.start ? html`<button type="button" class="btn wn-go" data-act="now-go" data-id="${T.id}">${icon(T.focus ? 'play' : 'arrowR')}${T.start}</button>` : ''}
     ${W.also.length ? html`<div class="wn-alt"><span>Or</span>${W.also.map((x) => html`<button type="button" class="btn link" data-act="now-go" data-id="${x.id}">${x.title}</button>`)}</div>` : ''}</section>`;
 }
-function nextUp(M, B) {
+// `same`: What now?'s title; Next up stays out of the way when it would only repeat it
+function nextUp(M, B, same) {
   const t = M.t, n = B.n, d = M.todayDay;
   const mk = M.mocks.find((x) => x.date === t && x.status !== 'skipped');
   let lbl = 'Next up', title, sub, act;
@@ -117,6 +133,7 @@ function nextUp(M, B) {
   else if (B.next) { lbl = 'Next · ' + fmtClock(B.next.from); title = B.next.label + ' · ' + B.next.title; sub = 'In ' + fmtMinsLeft(B.next.from - n); act = B.next.kind === 'workout' ? html`<a class="btn primary" href="#/run-5k">${icon('activity')}Open the run plan</a>` : html`<button type="button" class="btn primary" data-act="timer">${icon('timer')}Focus timer</button>`; }
   else if (mk && mk.marks == null) { title = 'Enter the marks for mock #' + mk.id; sub = mk.subject + ' · ' + mk.bossName; act = html`<a class="btn primary" href="#/mocks?id=${mk.id}">${icon('edit')}Enter marks</a>`; }
   else { title = d && d.logged ? 'Day logged. Rest well.' : 'Log today before you sleep'; sub = M.quote; act = d && d.logged ? html`<a class="btn primary" href="#/study-plan?date=${addDays(t, 1)}">${icon('calcheck')}See tomorrow</a>` : html`<button type="button" class="btn primary" data-act="quicklog">${icon('logbook')}Open the 10 PM log</button>`; }
+  if (same && String(title).trim().toLowerCase() === String(same).trim().toLowerCase()) return '';
   return html`<section class="card hero next-card span-4" aria-label="Next up"><span class="lbl">${icon('zap')} ${lbl}</span><p class="nu-title">${title}</p><p class="nu-sub">${sub}</p><div class="row wrap" style="margin-top:auto">${act}</div></section>`;
 }
 const fmtMinsLeft = (m) => (m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60 ? (m % 60) + ' min' : '') : m + ' min');
@@ -174,26 +191,20 @@ function runCard(M) {
   });
 }
 
-// ---------- row 4 ----------
-function kpiRow(M) {
-  const K = M.kpi, st = M.st, sylExp = M.EXP.syllabus(M.t) / 100, sylGap = K.syllabus.pct - sylExp;
-  const sylTone = sylGap >= 0 ? 'good' : sylGap >= -0.08 ? 'warn' : 'bad';
-  const ws = mondayOf(M.t), wd = []; for (let i = 0; i < 7; i++) wd.push(addDays(ws, i));
-  const vals = wd.map((x) => (x <= M.t ? M.hoursOn(x) : null)), tgts = wd.map((x) => (M.dayByDate[x] ? M.dayByDate[x].target : 0));
-  const rankName = String(M.rank ? M.rank.name : '').replace(/^\S+\s/, ''), nextName = M.nextRank ? String(M.nextRank.name).replace(/^\S+\s/, '') : '';
-  return html`<div class="tiles kpis">
-    <a class="tile" href="#/subjects"><span class="lbl">${icon('book')}Syllabus · R1</span><span class="value"><span data-count="${K.syllabus.done}">${K.syllabus.done}</span><small> / ${K.syllabus.total} chapters</small></span>
-      ${meter(K.syllabus.pct, { target: sylExp, targetLabel: 'expected by today', label: 'Chapters done against the plan' })}
-      <span class="tile-foot">${status(sylGap >= 0 ? 'On pace' : Math.max(1, Math.round(-sylGap * K.syllabus.total)) + ' behind plan', sylTone)}<span>${K.days.syllabus > 0 ? 'R1 deadline ' + fmtDS(st.syllabusDeadline) + ' · ' + plural(K.days.syllabus, 'day') : 'R1 deadline passed'}</span></span></a>
+// ---------- Progress: level, streak and badges ----------
+function rankTiles(M) {
+  const K = M.kpi, rankName = String(M.rank ? M.rank.name : '').replace(/^\S+\s/, ''), nextName = M.nextRank ? String(M.nextRank.name).replace(/^\S+\s/, '') : '';
+  const nb = M.badges.length, left = nb - M.badgeCount;
+  return html`<div class="tiles rank-tiles">
     <a class="tile hero" href="#/winter-arc"><span class="lbl">${icon('award')}Level and rank</span><span class="value">Level ${M.level}<small> · ${rankName}</small></span>
       ${meter(M.lvProg, { label: 'XP to the next level' })}
       <span class="tile-foot"><span>${fmtN(M.xp)} XP · ${fmtN(M.lvNext - M.xp)} to level ${M.level + 1}</span>${nextName ? html`<span>· ${nextName} at level ${M.nextRank.level}</span>` : ''}</span></a>
     <a class="tile" href="#/winter-arc"><span class="lbl">${icon('flame')}Study streak</span><span class="value"><span data-count="${K.streak.cur}">${K.streak.cur}</span><small> ${K.streak.cur === 1 ? 'day' : 'days'}</small></span>
       ${meter(K.streak.pct, { label: 'Streak towards the next milestone' })}
       <span class="tile-foot"><span>Best ${K.streak.best} · next milestone ${K.streak.next} days</span></span></a>
-    <a class="tile" href="#/analytics"><span class="lbl">${icon('clock')}This week</span><span class="value"><span data-count="${Math.round(K.week.hrs * 10) / 10}" data-dec="1">${fmt1(K.week.hrs)}</span><small> / ${fmt1(K.week.target)} h</small></span>
-      <span class="wk-bars">${miniBars(vals, tgts, diff(ws, M.t), { w: 168, h: 44 })}</span>
-      <span class="tile-foot"><span class="row" style="gap:6px"><i class="key" aria-hidden="true"></i>logged</span><span class="row" style="gap:6px"><i class="key hatch" aria-hidden="true"></i>planned</span><span>${K.week.delta >= 0 ? '+' : '−'}${fmt1(Math.abs(K.week.delta))} h vs last week</span></span></a>
+    <a class="tile" href="#/winter-arc"><span class="lbl">${icon('trophy')}Badges</span><span class="value"><span data-count="${M.badgeCount}">${M.badgeCount}</span><small> / ${nb}</small></span>
+      ${meter(M.badgeCount / Math.max(1, nb), { label: 'Badges unlocked' })}
+      <span class="tile-foot"><span>${left ? plural(left, 'badge') + ' still to unlock' : 'Every badge unlocked'}</span></span></a>
   </div>`;
 }
 function arcCard(M) {
@@ -239,13 +250,24 @@ export default {
     const B = blockState(M);
     const wk = promptWeek(M.t);
     const review = wk ? html`<section class="notice review-prompt" role="region" aria-label="Week in review">${icon('analytics')}<div class="grow"><p><b>Your week in review is ready</b> · ${fmtDS(wk)} – ${fmtDS(addDays(wk, 6))}</p><p class="muted">Hours, chapters, papers and mistakes against last week, with one focus for next week.</p></div><div class="row wrap"><button type="button" class="btn sm primary" data-act="review">Open the review</button><button type="button" class="btn sm ghost" data-act="review-later">Not now</button></div></section>` : '';
-    return html`${welcome(M)}${review}
-      <div class="grid dash-r1">${countdown(M)}${whatNowCard(M)}${hoursCard(M)}${timetableCard(M, B)}</div>
-      <div class="grid dash-r2"><div class="meters span-8">${targetMeters(M)}</div>${nextUp(M, B)}</div>
-      <div class="grid dash-r3">${planCard(M)}${logCard(M)}${runCard(M)}</div>
-      ${kpiRow(M)}
-      ${contentCard(M)}
-      <div class="grid">${arcCard(M)}${milestonesCard(M)}</div>`;
+    const W = whatNow(M, nowMin()), wnOn = isShown('whatnow');
+    const parts = {
+      whatnow: whatNowCard(M, W), next: nextUp(M, B, wnOn ? W.top.title : ''), timetable: timetableCard(M, B),
+      meters: html`<div class="meters">${targetMeters(M)}</div>`, plan: planCard(M), log: logCard(M), run: runCard(M), arc: arcCard(M),
+      finish: hoursCard(M), coming: milestonesCard(M), rank: rankTiles(M), content: contentCard(M)
+    };
+    const F = M.focus;
+    const meta = {
+      now: esc(fmtClock(B.n) + ' · ' + (B.cur ? B.cur.label + ' until ' + fmtClock(B.cur.end) : B.next ? 'free until ' + fmtClock(B.next.from) : 'day done')),
+      today: F.total ? esc(F.done + ' of ' + F.total + ' planned done') : '',
+      progress: '<a href="#/analytics">Analytics' + icon('arrowR') + '</a>'
+    };
+    const bands = BANDS.map(([b, name]) => {
+      const cells = bandCells(b, parts);
+      return cells ? '<section class="band" data-jump="' + name + '" aria-labelledby="band-' + b + '"><div class="band-h"><h2 id="band-' + b + '">' + name + '</h2>' + (meta[b] ? '<span class="band-meta">' + meta[b] + '</span>' : '') + '</div><div class="grid band-g">' + cells + '</div></section>' : '';
+    }).join('');
+    return html`${welcome(M)}${review}${isShown('summary') ? summary(M) : ''}${raw(bands)}
+      <div class="dash-foot"><button type="button" class="btn ghost sm" data-act="dash-customise">${icon('grid')}Customise the dashboard</button></div>`;
   },
   actions: {
     'arc-toggle': (el) => { const k = todayStr(), h = arc.config().habits.find((x) => x.id === el.dataset.id); if (h) arc.setVal(k, h, arc.val(k, h) >= 1 ? 0 : 1); },

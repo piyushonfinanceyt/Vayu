@@ -26,7 +26,7 @@ export const ERR_TYPES = [
 const ERR_BY = {}; ERR_TYPES.forEach((e) => { ERR_BY[e[0]] = e; });
 const PAPERS = [['Accounts', 'P1 Accounts'], ['Law', 'P2 Law'], ['Tax', 'P3 Tax'], ['Costing', 'P4 Costing'], ['Audit', 'P5 Audit'], ['FM&SM', 'P6 FM & SM']];
 const paperName = (k) => (PAPERS.find((p) => p[0] === k) || [k, k])[1];
-let preset = {}, drillOnEnter = false;
+let preset = {}, drillOnEnter = false, addOnEnter = false;
 
 function row(M, e) {
   return html`<li class="err ${e.fixed ? 'fixed' : ''}"><span class="li-main"><b>${e.chapter || e.note || 'Mistake'}</b><small>${fmtD(e.date)} · ${paperName(e.paper)}${e.source ? ' · ' + e.source : ''}${e.reviews ? ' · drilled ' + plural(e.reviews, 'time') : ''}${e.dueOn && !e.fixed ? ' · next ' + fmtD(e.dueOn) : ''}</small>${e.note && e.chapter ? html`<span class="err-rule">${icon('info')}${e.note}</span>` : ''}</span>
@@ -51,13 +51,17 @@ const openDrill = (list, title) => runDrill({
 });
 
 export default {
-  enter(q) { preset = { paper: q.paper || '', mock: q.mock || '' }; drillOnEnter = !!q.drill; },
+  enter(q) { preset = { paper: q.paper || '', mock: q.mock || '' }; drillOnEnter = !!q.drill; addOnEnter = !!q.add; },
   head(M) {
     const due = store.list('errors').filter((e) => errDue(e, M.t)).length;
     return { title: 'Error Book', sub: raw(esc((due ? plural(due, 'mistake') + ' due for review · ' : 'Nothing due · ') + 'Block D every evening: one line per lost mark, with the rule that stops it next time')),
       actions: due ? raw('<button type="button" class="btn primary" data-act="err-drill">' + icon('revision') + 'Drill ' + due + ' due</button>') : '' };
   },
-  after() { if (drillOnEnter) { drillOnEnter = false; setTimeout(() => openDrill(dueList(todayStr()), 'Drill · due today'), 80); } },
+  after() {
+    if (drillOnEnter) { drillOnEnter = false; setTimeout(() => openDrill(dueList(todayStr()), 'Drill · due today'), 80); }
+    // from the + quick actions: straight to the form
+    if (addOnEnter) { addOnEnter = false; setTimeout(() => { const f = document.getElementById('er-ch'); if (!f) return; f.closest('.card').scrollIntoView({ block: 'start' }); try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } }, 120); }
+  },
   render(M) {
     const t = M.t, all = sortBy(store.list('errors'), (e) => (e.date || '') + (e.createdAt || '')).reverse();
     const wk = all.filter((e) => e.date && e.date <= t && diff(e.date, t) < 7);

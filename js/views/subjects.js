@@ -77,12 +77,12 @@ function listBody(M, F) {
   if (!list.length) return empty('No chapters match these filters.', html`<button type="button" class="btn sm" data-act="subj-reset">Clear filters</button>`, 'filter');
   if (F.qW !== 'all' || F.any) {
     if (F.qW !== 'all') return html`${list.map((c) => chapterRow(M, c))}`;
-    return html`${M.WORLDS.map((w) => { const l = list.filter((c) => c.subject === w.key); return l.length ? html`<h3 class="grp-title"><i class="dot" style="--c:${w.c}"></i>${w.code} ${w.short} <span class="muted">${l.length}</span></h3>${l.map((c) => chapterRow(M, c))}` : ''; })}`;
+    return html`${M.WORLDS.map((w) => { const l = list.filter((c) => c.subject === w.key); return l.length ? html`<h3 class="grp-title" data-jump="${w.code} ${w.short}"><i class="dot" style="--c:${w.c}"></i>${w.code} ${w.short} <span class="muted">${l.length}</span></h3>${l.map((c) => chapterRow(M, c))}` : ''; })}`;
   }
   // no filters: this week's chapters open on top, then one folded group per paper
   const ws = mondayOf(M.t), we = addDays(ws, 6), wk = list.filter((c) => c.planned >= ws && c.planned <= we);
-  return html`${wk.length ? html`<h3 class="grp-title">This week · ${fmtDS(ws)} – ${fmtDS(we)} <span class="muted">${wk.length}</span></h3>${wk.map((c) => chapterRow(M, c))}` : html`<p class="hint">No chapters planned this week.</p>`}
-    ${M.WORLDS.map((w) => { const l = list.filter((c) => c.subject === w.key), key = 'sp-p' + w.paper; return html`<details class="grp" data-key="${key}" ${raw(isOpen(key) ? 'open' : '')}><summary><i class="dot" style="--c:${w.c}"></i><b>${w.code} ${w.short}</b><span class="muted small">${l.filter((c) => c.status === 'done').length} / ${l.length} done</span></summary><div class="grp-body">${l.map((c) => chapterRow(M, c))}</div></details>`; })}`;
+  return html`${wk.length ? html`<h3 class="grp-title" data-jump="This week">This week ·${fmtDS(ws)} – ${fmtDS(we)} <span class="muted">${wk.length}</span></h3>${wk.map((c) => chapterRow(M, c))}` : html`<p class="hint">No chapters planned this week.</p>`}
+    ${M.WORLDS.map((w) => { const l = list.filter((c) => c.subject === w.key), key = 'sp-p' + w.paper; return html`<details class="grp" data-key="${key}" data-jump="${w.code} ${w.short}" ${raw(isOpen(key) ? 'open' : '')}><summary><i class="dot" style="--c:${w.c}"></i><b>${w.code} ${w.short}</b><span class="muted small">${l.filter((c) => c.status === 'done').length} / ${l.length} done</span></summary><div class="grp-body">${l.map((c) => chapterRow(M, c))}</div></details>`; })}`;
 }
 function boardBody(M, F) {
   return html`<div class="board" role="list">${COLS.map(([k, label, ic]) => {

@@ -70,6 +70,24 @@ body.scrolled .topbar::before { opacity: 1; }
 .more-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; min-width: 420px; }
 .more-grid section { min-width: 0; }
 
+/* ---------- jump bar: section chips on long pages (jump.js) ---------- */
+.jump { position: sticky; top: 64px; z-index: 26; display: flex; width: max-content; max-width: 100%; margin: -4px 0 16px; padding: 4px; border-radius: var(--r-pill); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); transition: box-shadow .25s; }
+.jump.stuck { box-shadow: var(--shadow-pop); }
+.jump-in { display: flex; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain; }
+.jump-in::-webkit-scrollbar { display: none; }
+.jump button { flex: none; min-height: 34px; padding: 6px 13px; border-radius: var(--r-pill); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; transition: background .3s var(--ease), color .3s var(--ease), transform .12s; }
+.jump button:hover { color: var(--ink); }
+.jump button[aria-current="true"] { background: var(--hero); color: var(--on-hero); }
+.jump button:active { transform: scale(.95); }
+html:has(.jump) { scroll-padding-top: 132px; }
+@media (display-mode: standalone) and (min-width: 768px) { .jump { top: calc(64px + env(safe-area-inset-top)); } }
+
+/* press feedback and hold-for-more */
+a.tile, button.tile, .bb-item, .bb-add, .tab, .mi, .sheet-grid a, .sheet-grid button { -webkit-tap-highlight-color: transparent; }
+a.tile:active, button.tile:active { transform: scale(.985); }
+[data-hold] { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+.quick-pop { min-width: 260px; }
+
 /* ---------- phone bottom bar ---------- */
 .bottombar { display: none; }
 
@@ -129,11 +147,20 @@ body.scrolled .topbar::before { opacity: 1; }
   .live { display: none; }
   .brand b { font-size: 14px; }
   .page-head { margin: 22px 0 14px; }
-  .bottombar { position: fixed; z-index: 30; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; padding: 6px; border-radius: var(--r-pill); background: var(--hero); color: var(--on-hero-2); box-shadow: var(--shadow-pop); }
-  .bb-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 52px; border-radius: var(--r-pill); text-decoration: none; font-size: 11px; }
+  .bottombar { position: fixed; z-index: 30; left: 10px; right: 10px; bottom: calc(12px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) 58px repeat(3, minmax(0, 1fr)); align-items: center; padding: 5px; border-radius: var(--r-pill); background: var(--hero); color: var(--on-hero-2); box-shadow: var(--shadow-pop); }
+  .bb-item { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; min-height: 52px; padding: 0 2px; border-radius: var(--r-pill); text-decoration: none; font-size: 10.5px; letter-spacing: -.01em; transition: background .25s var(--ease), color .25s var(--ease), transform .12s; }
+  .bb-item > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .bb-item[aria-current="page"] { color: var(--on-hero); background: rgba(127, 127, 127, .22); }
-  .bb-add { justify-self: center; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--on-hero); color: var(--hero); }
+  .bb-item:active { transform: scale(.92); }
+  .bb-ic { position: relative; display: grid; }
+  .bb-n { position: absolute; top: -5px; left: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--on-hero); color: var(--hero); font-size: 10px; font-weight: 600; line-height: 16px; text-align: center; }
+  .bb-add { justify-self: center; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: var(--on-hero); color: var(--hero); transition: transform .15s var(--ease); }
+  .bb-add:active { transform: scale(.9); }
   .bb-add svg { width: 22px; height: 22px; }
+  .jump { top: 60px; margin: -2px 0 14px; }
+  html:has(.jump) { scroll-padding-top: 120px; }
+  .page-actions { gap: 6px; }
+  .page-actions .btn { min-height: 38px; padding: 6px 11px; gap: 6px; font-size: 13px; }
   .toasts { bottom: calc(96px + env(safe-area-inset-bottom)); }
   .scrim { padding-top: 6vh; }
   .more-grid { grid-template-columns: 1fr; min-width: 0; }

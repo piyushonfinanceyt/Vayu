@@ -5,14 +5,86 @@
 .welcome { margin-bottom: 14px; align-items: center; flex-wrap: wrap; }
 .welcome > .ic { width: 22px; height: 22px; color: var(--ink-3); flex: none; }
 
-.cd-card { display: flex; flex-direction: column; gap: 6px; }
-.cd-big { display: flex; align-items: baseline; gap: 10px; margin-top: 10px; }
-.cd-big .value { margin: 0; }
-.cd-days { color: var(--on-hero-2); font-size: 15px; }
-.cd { display: flex; gap: 8px; margin: 4px 0 14px; }
-.cd-u { display: flex; align-items: baseline; gap: 4px; padding: 6px 10px; border-radius: 12px; background: rgba(127, 127, 127, .18); }
-.cd-u b { font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.cd-u small { font-size: 11px; color: var(--on-hero-2); }
+/* four key numbers */
+.dsum { display: grid; gap: 14px; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
+.dsum .tile { padding: 15px 17px; gap: 3px; text-decoration: none; color: var(--ink); transition: transform .2s var(--ease), border-color .2s; }
+.dsum a.tile:hover { transform: translateY(-2px); border-color: var(--line-2); }
+.dsum .tile.hero { color: var(--on-hero); }
+.dsum .value { font-size: 28px; margin: 2px 0 0; }
+.dsum .meter { margin-top: 8px; }
+.dsum .tile-foot { padding-top: 7px; }
+.ds-cd-top { justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.ds-cd-main { display: flex; align-items: baseline; justify-content: space-between; gap: 6px 12px; flex-wrap: wrap; }
+.ds-clock { font-size: 13px; color: var(--on-hero-2); }
+.ds-clock b { font-size: 17px; font-weight: 500; color: var(--on-hero); margin-left: 2px; }
+.ds-cd .jtrack { margin-top: 10px; height: 5px; }
+.ds-cd .tile-foot { justify-content: space-between; }
+.ds-bars { margin-top: 6px; }
+.tone { display: inline-flex; align-items: center; gap: 4px; }
+.tone svg.ic { width: 14px; height: 14px; }
+.tone.good { color: var(--good); } .tone.warn { color: var(--warn); } .tone.bad { color: var(--bad); }
+@media (max-width: 1100px) { .dsum { grid-template-columns: repeat(3, minmax(0, 1fr)); } .dsum .ds-cd { grid-column: 1 / -1; } }
+@media (max-width: 767px) {
+  .dsum { gap: 8px; }
+  .dsum .tile:not(.ds-cd) { padding: 11px 11px 12px; border-radius: 18px; }
+  .dsum .tile:not(.ds-cd) .value { font-size: 21px; }
+  .dsum .tile:not(.ds-cd) .value small { font-size: 11.5px; }
+  .dsum .tile:not(.ds-cd) .lbl { font-size: 11.5px; gap: 4px; }
+  .dsum .tile:not(.ds-cd) .lbl svg { width: 14px; height: 14px; }
+  .dsum .tile:not(.ds-cd) .tile-foot { font-size: 11px; line-height: 1.3; }
+  .dsum .ds-bars { display: none; }
+}
+
+/* the three bands: Now, Today, Progress (cards packed into rows by dashlayout.js) */
+.band { margin-top: 30px; }
+.band-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 2px 12px; padding-bottom: 9px; border-bottom: 1px solid var(--line-2); }
+.band-h h2 { font-size: 12px; font-weight: 500; letter-spacing: .16em; text-transform: uppercase; color: var(--ink); }
+.band-meta { font-size: 12.5px; color: var(--ink-3); text-align: right; min-width: 0; }
+.band-meta a { display: inline-flex; align-items: center; gap: 4px; color: var(--ink-2); text-decoration: none; }
+.band-meta a:hover { color: var(--ink); }
+.band-meta svg.ic { width: 14px; height: 14px; }
+.band-g > .dc { grid-column: span var(--s, 12); min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.dc > * { flex: 1 1 auto; margin: 0 !important; }
+.dc.stack > * { flex: 0 0 auto; }
+.dc.stack > :last-child { flex: 1 1 auto; }
+.dc > .meters { flex: 0 0 auto; }
+@media (max-width: 1100px) { .band-g > .dc { grid-column: span var(--s-md, 12); } }
+@media (max-width: 767px) { .band { margin-top: 26px; } .band-g > .dc { grid-column: span 12; } }
+.rank-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rank-tiles .tile { text-decoration: none; color: var(--ink); gap: 6px; transition: transform .2s var(--ease), border-color .2s; }
+.rank-tiles .tile.hero { color: var(--on-hero); }
+.rank-tiles .tile:hover { transform: translateY(-2px); }
+.rank-tiles .meter { margin-top: 6px; }
+@media (max-width: 1100px) { .tiles.rank-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .tiles.rank-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } .rank-tiles > :first-child { grid-column: 1 / -1; } }
+.dash-foot { display: flex; justify-content: center; margin-top: 22px; }
+
+/* Customise the dashboard */
+.dz-h { font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); margin: 18px 2px 6px; }
+.dz-list li { display: flex; align-items: center; gap: 6px; border-top: 1px solid var(--line); padding: 4px 0; }
+.dz-list li:first-child { border-top: 0; }
+.dz-tog { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 4px 6px; border-radius: 12px; text-align: left; }
+.dz-tog:hover { background: var(--soft-2); }
+.dz-tog .li-main { display: grid; gap: 1px; min-width: 0; }
+.dz-tog b { font-weight: 500; }
+.dz-tog small { font-size: 12px; color: var(--ink-3); }
+.dz-list li.off b { color: var(--ink-3); }
+.sw { position: relative; flex: none; width: 36px; height: 22px; border-radius: 11px; background: var(--line-2); transition: background .2s; }
+.sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 2px rgba(0, 0, 0, .2); transition: transform .25s var(--ease); }
+[aria-checked="true"] > .sw { background: var(--hero); }
+[aria-checked="true"] > .sw::after { transform: translateX(14px); background: var(--on-hero); }
+.dz-mv { display: flex; flex: none; }
+
+/* Settings → Navigation */
+.nav-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 600px) { .nav-slots { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.nav-list li { align-items: center; }
+.nav-list li > svg.ic { color: var(--ink-3); }
+.nav-ctl { display: flex; flex: none; }
+.nav-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.nav-add .chip { min-height: 32px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; }
+.nav-add .chip:hover { border-color: var(--ink-3); color: var(--ink); }
+
 .jtrack { position: relative; height: 6px; border-radius: 6px; background: var(--hero-track); margin-top: auto; }
 .jtrack i { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--on-hero); }
 .jtrack b { position: absolute; top: -4px; bottom: -4px; width: 2px; border-radius: 2px; background: var(--on-hero-2); }
@@ -54,15 +126,6 @@
 .log-card.due { border-color: var(--ink); }
 .run-in { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .run-goal { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
-.dash-r3 > .span-3 { grid-column: span 3; }
-@media (max-width: 1100px) { .dash-r3 > .span-3, .dash-r3 > .span-4, .dash-r3 > .span-5 { grid-column: span 12; } }
-@media (max-width: 1100px) and (min-width: 768px) { .dash-r3 > .span-4, .dash-r3 > .span-3 { grid-column: span 6; } }
-
-.kpis { margin-top: 14px; }
-.kpis .tile { text-decoration: none; color: var(--ink); transition: transform .2s var(--ease); gap: 6px; }
-.kpis .tile.hero { color: var(--on-hero); }
-.kpis .tile:hover { transform: translateY(-2px); }
-.kpis .meter { margin-top: 6px; }
 .wk-bars { display: block; margin-top: 4px; }
 .mini-bars .bar { fill: var(--line-2); }
 .mini-bars .bar.on { fill: var(--ink); }
@@ -638,15 +701,6 @@ body.focus-on { overflow: hidden; }
 
 /* ================= What now? (Dashboard) ================= */
 /* always black: fixed colours, not theme tokens, so it looks the same in every theme and mode */
-.dash-r1 > .card { margin-top: 0; }
-.dash-r1 > .cd-card, .dash-r1 > .wn, .dash-r1 > .hours-card { grid-column: span 12; }
-@media (min-width: 1101px) {
-  .dash-r1 > .cd-card { grid-column: 1 / span 4; grid-row: 1; }
-  .dash-r1 > .tt-card { grid-column: 5 / span 8; grid-row: 1; }
-  .dash-r1 > .wn { grid-column: 1 / span 4; grid-row: 2; }
-  .dash-r1 > .hours-card { grid-column: 5 / span 8; grid-row: 2; }
-  .dash-r1:not(:has(.hours-card)) > .tt-card { grid-row: 1 / span 2; }
-}
 .hc-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
 .hc-nums > div { display: grid; gap: 1px; min-width: 0; }
 .hc-nums b { font-size: 26px; font-weight: 500; letter-spacing: -.02em; line-height: 1.2; }

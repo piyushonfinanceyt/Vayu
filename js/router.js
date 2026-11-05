@@ -1,13 +1,16 @@
 /* Hash router: #/route?key=value. Views are ES modules loaded on first visit (and prefetched when idle).
    Rendering keeps the field you are typing in, its caret, the scroll position and open <details>;
-   entering a tab cross-fades (View Transitions where supported) and plays the enter animations once. */
-import { $, esc, raw, reducedMotion, fmtLong, todayStr, asOf } from './util.js';
+   entering a tab slides it in from the side you're moving towards in your tab order (View Transitions where
+   supported), plays the enter animations once, and eases in the cards below the fold as they scroll into view.
+   Long pages get the jump bar (jump.js). */
+import { $, $$, esc, raw, reducedMotion, fmtLong, todayStr, asOf } from './util.js';
 import { icon } from './icons.js';
 import { model } from './model.js';
 import { closeMenu, countUp } from './components.js';
 import { resetSpecs, drawAll } from './charts.js';
-import { ROUTES, routeById, updateShell } from './shell.js';
+import { ROUTES, routeById, updateShell, navOrder } from './shell.js';
 import { setPref } from './prefs.js';
+import * as jump from './jump.js';
 
 const VIEWS = {
   dashboard: () => import('./views/dashboard.js'),
@@ -33,7 +36,7 @@ const VIEWS = {
 };
 const NEXT = {};
 const cache = {};
-let cur = { id: null, q: {} }, view = null, rendered = false, renderSeq = 0;
+let cur = { id: null, q: {} }, view = null, rendered = false, renderSeq = 0, dir = '';
 export const current = () => cur;
 export const currentView = () => view;
 
@@ -61,6 +64,7 @@ export function prefetch() { Object.keys(VIEWS).forEach((k) => { if (!cache[k]) 
 
 export async function onRoute() {
   const r = parseHash(), changed = r.id !== cur.id;
+  if (changed && cur.id) { const o = navOrder(), a = o.indexOf(cur.id), b = o.indexOf(r.id); dir = b > a ? 'fwd' : 'back'; } else dir = '';
   cur = r;
   closeMenu();
   view = await load(r.id);
@@ -95,12 +99,38 @@ function head(M, r, h) {
     (h.actions ? '<div class="page-actions">' + String(h.actions) + '</div>' : '') + '</div>';
 }
 
+// cards below the fold ease in as they scroll into view (page entry only; never with reduced motion)
+let reveal = null;
+function revealBelowFold(page) {
+  if (reveal) { reveal.disconnect(); reveal = null; }
+  if (reducedMotion() || !('IntersectionObserver' in window)) return;
+  const sel = '.card, .tiles, .meters, .dsum, .band-h, .notice';
+  // positions from the top of the page: entering a tab always starts at the top
+  const els = $$(sel, page).filter((el) => !el.parentElement.closest(sel) && el.getBoundingClientRect().top + window.scrollY > innerHeight - 24);
+  if (!els.length) return;
+  els.forEach((el) => el.classList.add('rv'));
+  let batch = 0, batchT = 0;
+  reveal = new IntersectionObserver((ents) => {
+    ents.forEach((en) => {
+      if (!en.isIntersecting) return;
+      reveal.unobserve(en.target);
+      en.target.style.transitionDelay = Math.min(batch++, 4) * 60 + 'ms';
+      en.target.classList.add('rv-in');
+    });
+    clearTimeout(batchT); batchT = setTimeout(() => { batch = 0; }, 120);
+  }, { rootMargin: '0px 0px -6% 0px' });
+  els.forEach((el) => reveal.observe(el));
+}
+
 export function render(mode) {
   if (!view) return;
   const M = model(), r = routeById(cur.id), enter = mode === 'enter';
+  const vt = enter && rendered && !!document.startViewTransition && !reducedMotion() && !document.hidden;
   resetSpecs();
   const body = String(view.render(M, cur.q));
-  const markup = head(M, r, view.head ? view.head(M, cur.q) : {}) + '<div class="page' + (enter ? ' anim' : '') + '" data-view="' + r.id + '">' + body + '</div>';
+  // without View Transitions the page itself slides in from the side you're moving towards
+  const slide = enter && !vt && dir && rendered && !reducedMotion() ? ' slide-' + dir : '';
+  const markup = head(M, r, view.head ? view.head(M, cur.q) : {}) + '<div class="page' + (enter ? ' anim' : '') + slide + '" data-view="' + r.id + '">' + body + '</div>';
   const main = $('#main'), y = window.scrollY, token = ++renderSeq;
   let applied = false;
   const apply = () => {
@@ -111,16 +141,19 @@ export function render(mode) {
     if (enter) countUp(main);
     drawAll(main, enter);
     if (view.after) { try { view.after(page, M, cur.q); } catch (e) { console.error(e); } }
+    try { jump.build(main, r.id); } catch (e) { console.error(e); }
+    if (enter) revealBelowFold(page);
     updateShell(M, r.id);
     document.title = (r.id === 'dashboard' ? '' : r.title + ' · ') + 'Vayu';
     if (!enter && window.scrollY !== y) window.scrollTo(0, y);
   };
-  if (enter && rendered && document.startViewTransition && !reducedMotion() && !document.hidden) {
+  if (vt) {
     try {
-      const vt = document.startViewTransition(apply);
+      document.documentElement.dataset.nav = dir || 'none';
+      const tr = document.startViewTransition(apply);
       // a skipped or aborted transition (newer navigation, hidden window) must never leave the old page on screen
-      [vt.ready, vt.finished].forEach((p) => p && p.catch(() => {}));
-      if (vt.updateCallbackDone) vt.updateCallbackDone.catch(() => apply());
+      [tr.ready, tr.finished].forEach((p) => p && p.catch(() => {}));
+      if (tr.updateCallbackDone) tr.updateCallbackDone.catch(() => apply());
       setTimeout(apply, 400);
     } catch (e) { apply(); }
   } else apply();

@@ -45,15 +45,29 @@ export const empty = (text, action, ic) => html`<div class="empty">${ic ? icon(i
 export const linkBtn = (href, label, ic) => html`<a class="btn sm ghost" href="${href}">${label}${icon(ic || 'arrowR')}</a>`;
 
 // ---------- count-up numbers (on page entry only) ----------
+// marked ones ([data-count]) and any tile figure that is a plain number ("62", "16.9", "1,240")
+const AUTO = '.tile .value, .hc-nums b, .mt-val b, .ct-tile b';
+const NUM = /^(\s*)(\d{1,3}(?:,\d{2,3})+|\d+)(\.\d+)?(\s*)$/;
+function roll(set, to, fmt) {
+  const t0 = performance.now(), dur = 750;
+  const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); set(fmt(to * e)); if (k < 1) requestAnimationFrame(step); else set(fmt(to)); };
+  set(fmt(0));
+  requestAnimationFrame(step);
+}
 export function countUp(root) {
   if (reducedMotion()) return;
   $$('[data-count]', root).forEach((el) => {
-    const to = +el.dataset.count, dec = +(el.dataset.dec || 0), suffix = el.dataset.suffix || '', t0 = performance.now(), dur = 750;
+    const to = +el.dataset.count, dec = +(el.dataset.dec || 0), suffix = el.dataset.suffix || '';
     if (!isFinite(to) || to === 0) return;
-    const fmt = (v) => (dec ? v.toFixed(dec) : Math.round(v).toLocaleString('en-IN')) + suffix;
-    const step = (t) => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); el.textContent = fmt(to * e); if (k < 1) requestAnimationFrame(step); else el.textContent = fmt(to); };
-    el.textContent = fmt(0);
-    requestAnimationFrame(step);
+    roll((s) => { el.textContent = s; }, to, (v) => (dec ? v.toFixed(dec) : Math.round(v).toLocaleString('en-IN')) + suffix);
+  });
+  $$(AUTO, root).forEach((el) => {
+    if (el.hasAttribute('data-count') || el.querySelector('[data-count]')) return;
+    const n = el.firstChild, m = n && n.nodeType === 3 ? NUM.exec(n.nodeValue) : null;
+    if (!m) return;
+    const dec = m[3] ? m[3].length - 1 : 0, comma = m[2].indexOf(',') >= 0, to = parseFloat((m[2] + (m[3] || '')).replace(/,/g, ''));
+    if (!isFinite(to) || to === 0) return;
+    roll((s) => { n.nodeValue = s; }, to, (v) => m[1] + (dec ? v.toFixed(dec) : comma ? Math.round(v).toLocaleString('en-IN') : String(Math.round(v))) + m[4]);
   });
 }
 

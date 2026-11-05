@@ -8,12 +8,14 @@ import * as sync from '../sync.js';
 import { go } from '../router.js';
 import { icon } from '../icons.js';
 import { card, chip, status, seg, toast, confirm, form } from '../components.js';
-import { themePref, setTheme, PALETTES, palettePref, setPalette } from '../prefs.js';
+import { themePref, setTheme, PALETTES, palettePref, setPalette, setPref } from '../prefs.js';
 import { renderSoon } from '../router.js';
+import { ROUTES, routeById, navTabs, navBar, buildShell } from '../shell.js';
 import * as store from '../store.js';
 import * as db from '../db.js';
 import { model as modelOf, AREA_SOURCES } from '../model.js';
 
+let navOnEnter = false;
 function field(label, path, type, val, attrs) {
   const shown = val == null ? '' : type === 'pct' ? Math.round(val * 1000) / 10 : val;
   return html`<label class="field"><span>${label}</span><input id="${'s-' + path.replace(/\./g, '-')}" class="in" type="${type === 'date' ? 'date' : type === 'text' ? 'text' : type === 'time' ? 'time' : 'number'}" ${raw(type === 'num' || type === 'pct' ? 'inputmode="decimal" step="any"' : '')} data-change="set" data-path="${path}" data-t="${type}" value="${shown}" ${raw(attrs || '')}></label>`;
@@ -50,6 +52,28 @@ function reminderCard() {
   });
 }
 
+// your shortcuts: the phone's four bottom-bar slots and the computer's top tabs (shell.js reads them)
+function navCard(exam) {
+  const tabs = navTabs().map(routeById), bar = navBar(), rest = ROUTES.filter((r) => !tabs.some((t) => t.id === r.id));
+  const slot = (i) => html`<label class="field"><span>Shortcut ${i + 1}</span><select class="in" id="nav-bb-${i}" data-change="nav-bar" data-i="${i}">${ROUTES.map((r) => html`<option value="${r.id}" ${raw(r.id === bar[i] ? 'selected' : '')}>${r.title}</option>`)}</select></label>`;
+  const row = (r, i) => html`<li>${icon(r.icon)}<span class="li-main"><b>${r.title}</b>${exam && r.examHide ? html`<small>In More while exam mode is on</small>` : ''}</span>
+    <span class="nav-ctl"><button type="button" class="icon-btn sm" data-act="nav-move" data-dir="-1" data-id="${r.id}" aria-label="Move ${r.title} up" ${raw(i === 0 ? 'aria-disabled="true"' : '')}>${icon('arrowU')}</button><button type="button" class="icon-btn sm" data-act="nav-move" data-dir="1" data-id="${r.id}" aria-label="Move ${r.title} down" ${raw(i === tabs.length - 1 ? 'aria-disabled="true"' : '')}>${icon('arrowD')}</button><button type="button" class="icon-btn sm" data-act="nav-out" data-id="${r.id}" aria-label="Move ${r.title} into More" ${raw(tabs.length === 1 ? 'aria-disabled="true"' : '')}>${icon('x')}</button></span></li>`;
+  return card({
+    id: 'nav-card', title: 'Navigation', icon: 'grid', sub: 'Your shortcuts, the tab order and the dashboard · saved on this device',
+    actions: html`<button type="button" class="btn sm ghost" data-act="nav-reset">Reset</button>`,
+    body: html`<h3 class="sub-h" style="margin-top:0">Phone bottom bar</h3>
+      <div class="fields nav-slots">${slot(0)}${slot(1)}${slot(2)}${slot(3)}</div>
+      <p class="hint">The + sits between shortcuts 2 and 3 and opens the quick log. Press and hold it, or right-click it on a computer, for more quick actions. More always lists every tab.</p>
+      <h3 class="sub-h">Top bar on a computer</h3>
+      <p class="hint" style="margin-top:0">Left to right, in this order. When the window is narrow, the last ones move into More.</p>
+      <ul class="list nav-list">${tabs.map(row)}</ul>
+      ${rest.length ? html`<p class="lbl" style="margin-top:12px">In More · tap to add to the top bar</p><div class="nav-add">${rest.map((r) => html`<button type="button" class="chip line" data-act="nav-in" data-id="${r.id}">${icon('plus')}${r.title}</button>`)}</div>` : ''}
+      <h3 class="sub-h">Dashboard</h3>
+      <div class="row wrap"><button type="button" class="btn sm" data-act="dash-customise">${icon('grid')}Customise the dashboard</button><span class="hint" style="margin:0">Hide the cards you don’t use and change their order.</span></div>`
+  });
+}
+const saveNav = (k, v, msg) => { setPref(k, v); buildShell(); renderSoon(); if (msg) toast(msg, { ms: 1400 }); };
+
 function syncCard() {
   const on = sync.connected(), S = sync.state, offline = S.kind === 'offline', ask = !on || sync.needsYou();
   const inputs = html`<div class="fields sync-fields">
@@ -77,7 +101,7 @@ export default {
     const profile = card({ cls: 'span-6', title: 'Profile and appearance', icon: 'user', body: html`<div class="fields">${field('Your name', 'player', 'text', st.player)}${field('Subtitle', 'subtitle', 'text', st.subtitle)}</div>
       <div class="field" style="margin-top:14px"><span>Theme</span>${seg('theme', [['light', 'Light'], ['dark', 'Dark'], ['system', 'System']], theme, { ink: true, label: 'Theme' })}<p class="hint">System follows your device’s light or dark setting. Saved on this device.</p></div>
       <div class="field" style="margin-top:14px"><span>Colour theme</span><div class="pal-picks" role="group" aria-label="Colour theme">${PALETTES.map((p) => html`<button type="button" class="pal" data-act="palette" data-id="${p.id}" aria-pressed="${String(palettePref() === p.id)}"><span class="pal-sw" aria-hidden="true">${p.swatch.map((c) => html`<i style="background:${c}"></i>`)}</span><b>${p.name}</b><small>${p.sub}</small></button>`)}</div><p class="hint">Each one has a light and a dark version. Saved on this device.</p></div>` });
-    const examCard = card({ cls: 'span-6', title: 'Exam mode', icon: 'cap', body: html`<button type="button" class="tog" data-act="exam-mode" aria-pressed="${String(exam)}">Exam mode until ${fmtDS(st.examModeEnd || '2027-01-12')}</button><p class="hint">${exam ? 'On: Notes and Habit Tracker move from the top bar into More, so the bar keeps to what serves the exam. Nothing is hidden; every tab stays one tap away.' : 'Off: every Group 1 tab is in the top bar.'}</p>
+    const examCard = card({ cls: 'span-6', title: 'Exam mode', icon: 'cap', body: html`<button type="button" class="tog" data-act="exam-mode" aria-pressed="${String(exam)}">Exam mode until ${fmtDS(st.examModeEnd || '2027-01-12')}</button><p class="hint">${exam ? 'On: Notes and Habit Tracker move from the top bar into More, so the bar keeps to what serves the exam. Nothing is hidden; every tab stays one tap away.' : 'Off: every tab you chose in Navigation is in the top bar.'}</p>
       <div class="fields" style="margin-top:12px">${field('R1 deadline · all chapters once', 'syllabusDeadline', 'date', st.syllabusDeadline)}${field('Paper 1 date', 'examDate', 'date', st.examDate)}${field('Paper start time', 'examTime', 'time', st.examTime)}</div>` });
     const plan = card({ title: 'Plan and targets', icon: 'calcheck', body: html`<h3 class="sub-h" style="margin-top:0">Daily study target · hours a day</h3><div class="fields">${st.phases.map((p, i) => field(p.name + ' · ' + fmtDS(p.from) + ' → ' + fmtDS(p.to), 'phases.' + i + '.hrs', 'num', p.hrs, 'min="0" max="24"'))}</div>
       <h3 class="sub-h">Habit targets</h3><div class="fields">${field('Pages a day', 'pages', 'num', st.pages)}${field('Steps a day', 'steps', 'num', st.steps)}${field('Push-ups on day 1', 'pushStart', 'num', st.pushStart)}${field('Add push-ups', 'pushAdd', 'num', st.pushAdd)}${field('…every N days', 'pushEvery', 'num', st.pushEvery)}${field('Push-up maximum', 'pushMax', 'num', st.pushMax)}${field('Minimum hours a day', 'minHours', 'num', st.minHours)}</div>
@@ -94,10 +118,18 @@ export default {
     const data = card({ cls: 'span-5', title: 'Your data', icon: 'database', body: html`<p class="muted small">Stored in ${kind === 'indexeddb' ? 'IndexedDB' : kind === 'localstorage' ? 'browser storage' : 'memory only'} on this device. ${meta.migratedFrom || ''}. Set up on ${String(meta.initializedAt || '').slice(0, 10)}.</p>
       <div class="row wrap" style="margin-top:12px"><a class="btn sm" href="#/tools">${icon('database')}Backup and restore</a></div>
       <div class="danger-zone"><b>Reset all data</b><p class="small muted">Every log, goal, note, journal entry and setting on this device goes back to the original plan. A restore point is kept so you can undo it from Tools.</p><button type="button" class="btn danger" data-act="reset-all">${icon('trash')}Reset all data</button></div>` });
-    return html`<div class="grid">${profile}${examCard}</div>${syncCard()}${reminderCard()}${plan}<div class="grid">${xpCard}${timerCard}</div><div class="grid">${areas}${data}</div>`;
+    return html`<div class="grid">${profile}${examCard}</div>${navCard(exam)}${syncCard()}${reminderCard()}${plan}<div class="grid">${xpCard}${timerCard}</div><div class="grid">${areas}${data}</div>`;
   },
+  enter(q) { navOnEnter = !!q.nav; },
+  after() { if (navOnEnter) { navOnEnter = false; const c = document.getElementById('nav-card'); if (c) setTimeout(() => c.scrollIntoView({ block: 'start' }), 60); } },
   segs: { theme: (v) => setTheme(v) },
   changes: {
+    'nav-bar': (el) => {
+      const b = navBar(), i = +el.dataset.i, v = el.value, j = b.indexOf(v);
+      if (j >= 0 && j !== i) b[j] = b[i];   // already in another slot: the two swap
+      b[i] = v;
+      saveNav('navBar', b, 'Bottom bar saved');
+    },
     'remind-time': (el) => { pwa.setReminderTime(el.value); toast('Reminder time · ' + fmtClock(timeToMin(el.value)), { ms: 1400 }); },
     set: (el) => {
       const t = el.dataset.t; let v = el.value;
@@ -109,6 +141,10 @@ export default {
     }
   },
   actions: {
+    'nav-move': (el) => { const t = navTabs(), i = t.indexOf(el.dataset.id), j = i + (+el.dataset.dir); if (i < 0 || j < 0 || j >= t.length) return; [t[i], t[j]] = [t[j], t[i]]; saveNav('navTabs', t); setTimeout(() => { const b = document.querySelector('[data-act="nav-move"][data-dir="' + el.dataset.dir + '"][data-id="' + el.dataset.id + '"]'); if (b && b.getAttribute('aria-disabled') !== 'true') b.focus(); }, 160); },
+    'nav-out': (el) => { const t = navTabs().filter((id) => id !== el.dataset.id); if (t.length) saveNav('navTabs', t, routeById(el.dataset.id).title + ' is in More'); },
+    'nav-in': (el) => saveNav('navTabs', navTabs().concat(el.dataset.id), routeById(el.dataset.id).title + ' added to the top bar'),
+    'nav-reset': () => { setPref('navTabs', null); saveNav('navBar', null, 'Navigation back to the original'); },
     palette: (el) => { setPalette(el.dataset.id); renderSoon(); toast((PALETTES.find((p) => p.id === el.dataset.id) || {}).name + ' theme', { icon: 'palette', ms: 1400 }); },
     'remind-toggle': async () => {
       if (pwa.reminder().on) { pwa.disableReminder(); toast('Reminder off'); return; }

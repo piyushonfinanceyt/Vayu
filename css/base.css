@@ -61,8 +61,25 @@ table { border-collapse: collapse; width: 100%; }
 ::view-transition-old(main-view) { animation: .18s ease both fade-out-quick; }
 ::view-transition-new(main-view) { animation: .32s var(--ease) both fade-up; }
 @keyframes fade-out-quick { to { opacity: 0; } }
+/* moving through your tabs: the new page slides in from the side you're heading to */
+html[data-nav="fwd"]::view-transition-old(main-view) { animation: .2s ease both slide-out-l; }
+html[data-nav="fwd"]::view-transition-new(main-view) { animation: .36s var(--ease) both slide-in-r; }
+html[data-nav="back"]::view-transition-old(main-view) { animation: .2s ease both slide-out-r; }
+html[data-nav="back"]::view-transition-new(main-view) { animation: .36s var(--ease) both slide-in-l; }
+@keyframes slide-in-r { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+@keyframes slide-in-l { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: none; } }
+@keyframes slide-out-l { to { opacity: 0; transform: translateX(-24px); } }
+@keyframes slide-out-r { to { opacity: 0; transform: translateX(24px); } }
+/* browsers without View Transitions: the page slides in on its own */
+.page.slide-fwd { animation: slide-in-r .36s var(--ease) both; }
+.page.slide-back { animation: slide-in-l .36s var(--ease) both; }
+/* cards below the fold ease in as you scroll to them (router.js adds these on page entry) */
+.rv { opacity: 0; transform: translateY(18px); transition: opacity .5s var(--ease), transform .6s var(--ease); }
+.anim .rv, .anim .rv .tile { animation: none; }
+.rv.rv-in { opacity: 1; transform: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-delay: 0s !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
-  ::view-transition-old(main-view), ::view-transition-new(main-view) { animation: none; }
+  ::view-transition-old(main-view), ::view-transition-new(main-view) { animation: none !important; }
+  .rv { opacity: 1; transform: none; }
 }
