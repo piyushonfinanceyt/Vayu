@@ -50,6 +50,22 @@
 .dc > .meters { flex: 0 0 auto; }
 @media (max-width: 1100px) { .band-g > .dc { grid-column: span var(--s-md, 12); } }
 @media (max-width: 767px) { .band { margin-top: 26px; } .band-g > .dc { grid-column: span 12; } }
+/* Today's study: the goal strip, then a column per study block; the run and other tasks sit in "Also today" */
+.sd-goal { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 6px 16px; padding: 12px 14px 14px; border-radius: 14px; background: var(--soft-2); margin-bottom: 16px; }
+.sd-goal-t { display: grid; gap: 2px; min-width: 0; }
+.sd-goal-t b { font-size: 19px; font-weight: 500; letter-spacing: -.015em; line-height: 1.25; }
+.sd-goal-n { color: var(--ink-2); text-align: right; }
+.sd-goal-n b { color: var(--ink); font-weight: 500; }
+.sd-goal .meter { grid-column: 1 / -1; margin-top: 4px; background: var(--line-2); }
+.sd-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px 28px; align-items: start; }
+.sd-grp-h { display: flex; align-items: center; gap: 10px; padding-bottom: 9px; margin-bottom: 6px; border-bottom: 1px solid var(--line-2); }
+.sd-grp-h .lbl { display: block; }
+.sd-grp-h b { font-size: 15.5px; line-height: 1.3; }
+.sd-n { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.sd-also { margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line-2); }
+.sd-also ul { display: flex; flex-wrap: wrap; gap: 0 28px; margin-top: 4px; }
+.sd-also .check { border-top: 0; padding: 6px 0; align-items: center; }
+@media (max-width: 600px) { .sd-goal { grid-template-columns: minmax(0, 1fr); } .sd-goal-n { text-align: left; } }
 .rank-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rank-tiles .tile { text-decoration: none; color: var(--ink); gap: 6px; transition: transform .2s var(--ease), border-color .2s; }
 .rank-tiles .tile.hero { color: var(--on-hero); }

@@ -2,7 +2,8 @@
    On top, four key numbers: the countdown to Paper 1 (hero), R1 chapters against the plan, the pass outlook, this week.
    Then three bands, each a jump-bar section:
    Now: What now? and Next up, beside today's timetable with a live "now" line.
-   Today: the four target meters, today's plan, the 10 PM log, today's run, the Winter Arc habits.
+   Today: today's study (the day's goal and its to-do list, block by block), the four target meters, the 10 PM log,
+   today's run, the Winter Arc habits.
    Progress: Can I finish?, the next milestones, level, streak and badges (and Piyush on Finance from 13 Jan).
    Customise hides cards and changes their order within a band (dashlayout.js, saved on this device). */
 import { html, raw, esc, fmt1, fmtN, fmtD, fmtDS, fmtDL, fmtLong, plural, mmss, pct, diff, addDays, mondayOf, nowMin, fmtClock, greeting, now, typeName, clamp01, todayStr } from '../util.js';
@@ -138,24 +139,83 @@ function nextUp(M, B, same) {
 }
 const fmtMinsLeft = (m) => (m >= 60 ? Math.floor(m / 60) + ' h ' + (m % 60 ? (m % 60) + ' min' : '') : m + ' min');
 
-// ---------- row 3 ----------
-function planCard(M) {
-  const items = M.focus.items, t = M.t;
-  const row = (it) => {
-    let ctl;
-    if (it.kind === 'chapter') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="chapter-toggle" data-id="${it.chapterId}" aria-label="${(it.done ? 'Mark not done: ' : 'Mark done: ') + it.title}">${icon('check')}</button>`;
-    else if (it.kind === 'plan') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="plan-toggle" data-id="${it.taskId}" data-date="${t}" data-title="${it.title}" aria-label="${(it.done ? 'Mark not done: ' : 'Mark done: ') + it.title}">${icon('check')}</button>`;
-    else if (it.kind === 'workout') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="workout-toggle" data-date="${t}" aria-label="${(it.done ? 'Mark not done: ' : 'Mark done: ') + it.title}">${icon('check')}</button>`;
-    else if (it.kind === 'task') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="task-toggle" data-id="${it.taskId}" aria-label="${(it.done ? 'Mark not done: ' : 'Mark done: ') + it.title}">${icon('check')}</button>`;
-    else ctl = html`<a class="cbx" href="#/mocks?id=${it.mockId}" role="checkbox" aria-checked="${String(it.done)}" aria-label="${it.title}: ${it.done ? 'marks entered' : 'enter marks'}">${icon('check')}</a>`;
-    return html`<li class="check ${it.done ? 'done' : ''}">${ctl}<span class="li-main"><b>${it.title}</b><small>${raw(it.color && it.kind === 'chapter' ? '<i class="dot" style="--c:' + it.color + ';margin-right:6px"></i>' : '')}${it.cat}${it.est ? ' · ' + (it.est >= 60 ? fmt1(it.est / 60) + ' h' : it.est + ' min') : ''}${it.sub ? ' · ' + it.sub : ''}</small></span>${it.priority === 'high' ? html`<span class="prio p-high">HIGH</span>` : ''}</li>`;
+// ---------- Today's study: the day's goal, then the to-do list block by block ----------
+// Chapters go under the block whose bullets name them (Block A: Audit R1, Block B: Accounts R1 …), the revision dose
+// (the afternoon's timed sets and marking) gets its own group, and the run and non-study tasks sit apart in "Also today".
+const STUDY_CATS = ['Accounts', 'Law', 'Tax', 'Costing', 'Audit', 'FM&SM', 'Revision', 'Mock test'];
+const noHrs = (s) => String(s || '').replace(/^•\s*/, '').replace(/\s*\(\d+(\.\d+)?h\)\s*$/, '').trim();
+const firstLine = (s) => noHrs(String(s || '').split('\n')[0]);
+const bulletsOf = (s) => String(s || '').split('\n').slice(1).map(noHrs).filter(Boolean);
+const dur = (m) => (m >= 60 ? fmt1(m / 60) + ' h' : m + ' min');
+// a block's name cut down for the one-line goal: "Audit R1 — close gaps first" → "Audit R1",
+// "EXAM · P1 Advanced Accounting · 2–5 PM (…)" → "EXAM · P1 Advanced Accounting"
+function shortGoal(t) {
+  let s = String(t).split(' — ')[0].replace(/\s*\([^)]*\)/g, '').trim();
+  if (s.length > 36) { const p = s.split(' · '); s = p.length > 1 && p[0].length < 12 ? p[0] + ' · ' + p[1] : p[0]; }
+  if (s.length > 36) s = s.split(/: |, /)[0];
+  return s;
+}
+// lower-case a name that follows a comma, unless it starts with a paper's name
+const midSentence = (s) => (/^[A-Z][a-z]/.test(s) && !/^(Accounts|Advanced|Law|Corporate|Tax|Income|GST|Costing|Cost|Audit|FM|SM)\b/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+function studyPlan(M, B) {
+  const d = M.todayDay, groups = [], also = [], by = {};
+  const tag = (b) => (b ? b.label + ' · ' + fmtClock(b.from) + ' · ' + dur(b.dur) : '');
+  const head = (src, fallback) => { const t = firstLine(src), b = B.blocks.find((x) => x.title === t); return { tag: tag(b), from: b ? b.from : null, title: t.replace(/^Block [A-Z] · /, '').replace(/:$/, '') || fallback }; };
+  const add = (key, h, it) => { if (!by[key]) { by[key] = Object.assign({ key, items: [] }, h); groups.push(by[key]); } by[key].items.push(it); };
+  const mainB = d ? bulletsOf(d.main) : [], sideB = d ? bulletsOf(d.side) : [];
+  M.focus.items.forEach((it) => {
+    if (it.kind === 'workout') return also.push(it);
+    if (it.kind === 'task') return STUDY_CATS.includes(it.cat) ? add('tasks', { tag: '', title: 'Your study tasks' }, it) : also.push(it);
+    if ((it.kind === 'chapter' && mainB.includes(it.title)) || it.cat === 'Main quest') return add('main', head(d.main, 'Main quest'), it);
+    if ((it.kind === 'chapter' && sideB.includes(it.title)) || it.cat === 'Side quest') return add('side', head(d.side, 'Side quest'), it);
+    if (it.kind === 'chapter') return add('ch-' + it.cat, { tag: '', title: it.cat }, it);
+    if (it.kind === 'mock') { const p = B.blocks.find((b) => b.label === 'Paper' || b.label === 'Exam'); return add('mock', { tag: tag(p), from: p ? p.from : null, title: 'Full paper, handwritten' }, it); }
+    const timed = /timed/i.test(it.title), c = timed && B.blocks.find((b) => b.kind === 'mock');
+    add('rev', { tag: c ? (c.label === 'Block C' ? 'Block C + D' : c.label) + ' · ' + fmtClock(c.from) : '', from: c ? c.from : null, title: timed ? 'Timed writing and marking' : 'Revision' }, it);
+  });
+  // in the order of the day's blocks; groups with no block (your tasks, a revision dose) go last
+  const rank = { main: 0, side: 1 }, at = (g) => (g.from != null ? g.from : 9999 + (rank[g.key] ?? 2));
+  groups.sort((a, b) => at(a) - at(b));
+  const all = groups.flatMap((g) => g.items);
+  return { groups, also, done: all.filter((i) => i.done).length, total: all.length };
+}
+function checkRow(M, it, opts = {}) {
+  const t = M.t, lbl = (it.done ? 'Mark not done: ' : 'Mark done: ') + it.title;
+  let ctl;
+  if (it.kind === 'chapter') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="chapter-toggle" data-id="${it.chapterId}" aria-label="${lbl}">${icon('check')}</button>`;
+  else if (it.kind === 'plan') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="plan-toggle" data-id="${it.taskId}" data-date="${t}" data-title="${it.title}" aria-label="${lbl}">${icon('check')}</button>`;
+  else if (it.kind === 'workout') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="workout-toggle" data-date="${t}" aria-label="${lbl}">${icon('check')}</button>`;
+  else if (it.kind === 'task') ctl = html`<button type="button" class="cbx" role="checkbox" aria-checked="${String(it.done)}" data-act="task-toggle" data-id="${it.taskId}" aria-label="${lbl}">${icon('check')}</button>`;
+  else ctl = html`<a class="cbx" href="#/mocks?id=${it.mockId}" role="checkbox" aria-checked="${String(it.done)}" aria-label="${it.title}: ${it.done ? 'marks entered' : 'enter marks'}">${icon('check')}</a>`;
+  // the revision dose reads as two lines: the timed sets, then the marking
+  let parts = it.kind === 'plan' && it.cat === 'Revision' ? String(it.title).split(' · ') : [it.title];
+  let small = opts.brief ? '' : it.kind === 'task' ? [it.cat, it.est ? dur(it.est) : ''].filter(Boolean).join(' · ') : it.kind === 'plan' ? [parts.slice(1).join(' · '), it.sub].filter(Boolean).join(' · ') : it.kind === 'mock' ? it.sub : it.status === 'progress' ? 'In progress' : '';
+  // a quest whose first line is already the group's heading shows what's under it instead
+  if (it.kind === 'plan' && opts.head && noHrs(parts[0]).replace(/:$/, '').endsWith(opts.head)) { parts = [it.sub || 'Done with this block']; small = ''; }
+  return html`<li class="check ${it.done ? 'done' : ''}">${ctl}<span class="li-main"><b>${parts[0]}</b>${small ? html`<small>${small}</small>` : ''}</span>${it.priority === 'high' ? html`<span class="prio p-high">HIGH</span>` : ''}</li>`;
+}
+function studyCard(M, S) {
+  const d = M.todayDay, r = d ? d.rec : store.dayRec(M.t), hrs = +r.hrs || 0, tgt = d ? d.target : 0;
+  const chOf = (it) => (it.kind === 'chapter' ? M.chapters.find((c) => c.id === it.chapterId) : null);
+  const grp = (g) => {
+    const n = g.items.filter((i) => i.done).length, next = g.items.map(chOf).find((c, i) => c && !g.items[i].done);
+    return html`<div class="sd-grp${n === g.items.length ? ' all' : ''}"><div class="sd-grp-h"><span class="li-main">${g.tag ? html`<span class="lbl">${g.tag}</span>` : ''}<b>${g.title}</b></span>
+      <span class="sd-n">${n === g.items.length ? html`<span class="tone good">${icon('check')}Done</span>` : n + ' / ' + g.items.length}</span>
+      ${next ? html`<button type="button" class="icon-btn sm" data-act="focus" data-subject="${next.subject}" data-chapter="${next.id}" aria-label="Deep focus on ${next.name}" title="Deep focus on ${next.name}">${icon('play')}</button>` : ''}</div>
+      <ul>${g.items.map((it) => checkRow(M, it, { head: g.title }))}</ul></div>`;
   };
-  const F = M.focus;
+  // the goal in one line, from each block's short name: "Audit R1, Accounts R1, then timed writing and marking"
+  const names = [...new Set(S.groups.map((g) => shortGoal(g.title)))].map((s, i) => (i ? midSentence(s) : s));
+  const say = names.length > 1 ? names.slice(0, -1).join(', ') + ', then ' + names[names.length - 1] : names[0] || 'Study ' + fmt1(tgt) + ' h';
+  const goal = d ? html`<div class="sd-goal"><div class="sd-goal-t"><span class="lbl">Today’s goal · ${fmt1(tgt)} h${S.total ? ' · ' + plural(S.total, 'task') : ''}</span><b>${say}</b></div>
+      <span class="sd-goal-n small">${r.hrs == null && !hrs ? 'No hours logged yet' : hrs >= tgt ? html`<span class="tone good">${icon('check')}${fmt1(hrs)} h studied</span>` : html`<b>${fmt1(hrs)} h</b> studied · ${fmt1(tgt - hrs)} h to go`}</span>
+      ${meter(tgt ? hrs / tgt : 0, { tone: hrs >= tgt && tgt ? 'good' : '', label: fmt1(hrs) + ' of ' + fmt1(tgt) + ' hours studied today' })}</div>` : '';
   return card({
-    cls: 'span-5', title: 'Today’s plan', icon: 'calcheck', sub: M.todayDay ? M.todayDay.label + ' · ' + M.todayDay.phase : 'Outside the plan',
-    actions: F.total ? html`<span class="row" style="gap:8px">${ring(F.pct || 0, { size: 36, stroke: 4, label: F.done + ' of ' + F.total + ' done' })}<span class="small"><b>${F.done}</b> / ${F.total}</span></span>` : '',
-    body: F.total ? html`<ul>${items.map(row)}</ul>` : empty('Nothing planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'calcheck'),
-    foot: M.overdueCount ? html`<a class="chip bad" href="#/subjects?flag=overdue">${icon('alert')}${plural(M.overdueCount, 'chapter')} overdue</a><a class="btn sm ghost" href="#/study-plan">Full plan${icon('arrowR')}</a>` : ''
+    cls: 'study-card', id: 'today-study', title: 'Today’s study', icon: 'book', sub: d ? d.label + ' · ' + (d.ramp ? d.ramp.name : d.phase) : 'Outside the plan',
+    actions: S.total ? html`<span class="row" style="gap:8px">${ring(S.done / S.total, { size: 36, stroke: 4, label: S.done + ' of ' + S.total + ' study tasks done' })}<span class="small"><b>${S.done}</b> / ${S.total}</span></span>` : '',
+    body: S.total || S.also.length ? html`${goal}${S.groups.length ? html`<div class="sd-groups">${S.groups.map(grp)}</div>` : empty('No study planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'book')}
+      ${S.also.length ? html`<div class="sd-also"><span class="lbl">Also today</span><ul>${S.also.map((it) => checkRow(M, it, { brief: true }))}</ul></div>` : ''}` : empty('Nothing planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'calcheck'),
+    foot: html`${M.overdueCount ? html`<a class="chip bad" href="#/subjects?flag=overdue">${icon('alert')}${plural(M.overdueCount, 'chapter')} overdue</a>` : ''}<span class="grow"></span><a class="btn sm ghost" href="#/study-plan">Mission briefing${icon('arrowR')}</a>`
   });
 }
 function logCard(M) {
@@ -250,16 +310,15 @@ export default {
     const B = blockState(M);
     const wk = promptWeek(M.t);
     const review = wk ? html`<section class="notice review-prompt" role="region" aria-label="Week in review">${icon('analytics')}<div class="grow"><p><b>Your week in review is ready</b> · ${fmtDS(wk)} – ${fmtDS(addDays(wk, 6))}</p><p class="muted">Hours, chapters, papers and mistakes against last week, with one focus for next week.</p></div><div class="row wrap"><button type="button" class="btn sm primary" data-act="review">Open the review</button><button type="button" class="btn sm ghost" data-act="review-later">Not now</button></div></section>` : '';
-    const W = whatNow(M, nowMin()), wnOn = isShown('whatnow');
+    const W = whatNow(M, nowMin()), wnOn = isShown('whatnow'), S = studyPlan(M, B);
     const parts = {
       whatnow: whatNowCard(M, W), next: nextUp(M, B, wnOn ? W.top.title : ''), timetable: timetableCard(M, B),
-      meters: html`<div class="meters">${targetMeters(M)}</div>`, plan: planCard(M), log: logCard(M), run: runCard(M), arc: arcCard(M),
+      meters: html`<div class="meters">${targetMeters(M)}</div>`, plan: studyCard(M, S), log: logCard(M), run: runCard(M), arc: arcCard(M),
       finish: hoursCard(M), coming: milestonesCard(M), rank: rankTiles(M), content: contentCard(M)
     };
-    const F = M.focus;
     const meta = {
       now: esc(fmtClock(B.n) + ' · ' + (B.cur ? B.cur.label + ' until ' + fmtClock(B.cur.end) : B.next ? 'free until ' + fmtClock(B.next.from) : 'day done')),
-      today: F.total ? esc(F.done + ' of ' + F.total + ' planned done') : '',
+      today: S.total ? esc(S.done + ' of ' + S.total + ' study tasks done') : '',
       progress: '<a href="#/analytics">Analytics' + icon('arrowR') + '</a>'
     };
     const bands = BANDS.map(([b, name]) => {
