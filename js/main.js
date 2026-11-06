@@ -10,6 +10,7 @@ import { applyTheme, setTheme, resolvedTheme, onSystemTheme, setOpen, setPref, p
 import { openReview, promptWeek } from './weekly.js';
 import { buildShell, layoutTabs, placeIndicator, moreMenu, moreSheet, notifications, profileMenu, shortcutsHelp, quickMenu } from './shell.js';
 import { openCustomise } from './dashlayout.js';
+import { applyReplan, resetReplan } from './replan.js';
 import { openCardForm } from './cards.js';
 import { onRoute, render, renderSoon, currentView, current, go, prefetch } from './router.js';
 import { openPalette, isOpen as paletteOpen } from './palette.js';
@@ -69,7 +70,10 @@ export const GLOBAL = {
   welcome: () => store.setMeta('welcomeDismissed', true),
   review: () => { openReview(model()); renderSoon(); },
   'review-later': () => { setPref('reviewSeen', promptWeek(todayStr())); renderSoon(); },
-  'dash-customise': () => openCustomise(() => renderSoon())
+  'dash-customise': () => openCustomise(() => renderSoon()),
+  // catch-up dates: Study Plan's Catch up card and the Dashboard's overdue rescue
+  'replan-apply': () => applyReplan(),
+  'replan-reset': () => resetReplan()
 };
 
 // ---------- hold the + (bottom bar, dock) for the quick actions; a plain tap still opens the quick log ----------

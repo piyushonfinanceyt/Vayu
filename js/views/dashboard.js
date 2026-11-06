@@ -20,6 +20,7 @@ import { hoursCheck } from '../hours.js';
 import * as sync from '../sync.js';
 import { contentCard } from './insights.js';
 import { BANDS, bandCells, isShown } from '../dashlayout.js';
+import { replan, PACES, paceNow } from '../replan.js';
 
 // ---------- the four key numbers ----------
 function summary(M) {
@@ -194,6 +195,26 @@ function checkRow(M, it, opts = {}) {
   if (it.kind === 'plan' && opts.head && noHrs(parts[0]).replace(/:$/, '').endsWith(opts.head)) { parts = [it.sub || 'Done with this block']; small = ''; }
   return html`<li class="check ${it.done ? 'done' : ''}">${ctl}<span class="li-main"><b>${parts[0]}</b>${small ? html`<small>${small}</small>` : ''}</span>${it.priority === 'high' ? html`<span class="prio p-high">HIGH</span>` : ''}</li>`;
 }
+// Overdue rescue: the catch-up planner's answer where the day's study is (replan.js, at the pace picked in Catch up).
+// Shows while any chapter is overdue: how many and how much plan time, where they'd go, and one tap to use the dates.
+function rescue(M) {
+  if (!M.overdueCount) return '';
+  const pace = paceNow(), R = replan(M, pace), dl = fmtDS(R.deadline);
+  const hrs = M.chapters.filter((c) => c.flag === 'overdue').reduce((a, c) => a + (+c.hrs || 0), 0);
+  const late = R.pastDeadline && R.finish ? diff(R.deadline, R.finish) : 0;
+  const at = pace === 1 ? '' : ' at ' + (PACES.find((p) => p[0] === pace) || [0, ''])[1] + ' pace';
+  const say = !R.moves.length ? 'No better dates at this pace. Catch up has slower paces to try.'
+    : R.mode === 'fold' ? 'They fit into the room left on lighter days and the buffer day. Nothing else moves, and R1 still ends by ' + fmtDS(R.finish) + ' (deadline ' + dl + ').'
+    : R.fits ? 'New dates' + at + ' for ' + plural(R.moves.length, 'chapter') + ', and R1 still ends by ' + fmtDS(R.finish) + ' (deadline ' + dl + ').'
+    : 'New dates' + at + ' for ' + plural(R.moves.length, 'chapter') + ', but R1 ends ' + (R.finish ? fmtDS(R.finish) + ', ' + plural(late, 'day') + ' after the ' + dl + ' deadline' : 'after the exam') + ': ' + R.pastDeadline + ' of them land in the revision days after it.' + (R.nowhere.length ? ' ' + plural(R.nowhere.length, 'chapter') + (R.nowhere.length === 1 ? ' doesn’t' : ' don’t') + ' fit before the exam at all.' : '');
+  // where the moved chapters land: the first four days
+  const ids = new Set(R.moves.map((m) => String(m.id)));
+  const land = R.days.map((x) => [x.date, x.ids.filter((id) => ids.has(String(id))).length]).filter((x) => x[1]);
+  return html`<div class="notice sd-rescue ${R.fits ? '' : 'warn'}" role="region" aria-label="Overdue chapters">${icon('alert')}
+    <div class="grow"><p><b>${plural(M.overdueCount, 'chapter')} overdue</b> · ${fmt1(hrs)} h of plan time</p><p class="sd-say">${say}</p>
+      ${land.length ? html`<p class="sd-land"><span class="lbl">Where they go</span>${land.slice(0, 4).map(([dt, n]) => html`<span><b>${dt === M.t ? 'Today' : fmtDS(dt)}</b> +${n}</span>`)}${land.length > 4 ? html`<span>+ ${plural(land.length - 4, 'more day')}</span>` : ''}</p>` : ''}</div>
+    <div class="sd-rescue-act">${R.moves.length ? html`<button type="button" class="btn primary sm" data-act="replan-apply">${icon('calcheck')}Use these dates</button>` : ''}<a class="btn ghost sm" href="#/study-plan?catchup=1">Details${icon('arrowR')}</a></div></div>`;
+}
 function studyCard(M, S) {
   const d = M.todayDay, r = d ? d.rec : store.dayRec(M.t), hrs = +r.hrs || 0, tgt = d ? d.target : 0;
   const chOf = (it) => (it.kind === 'chapter' ? M.chapters.find((c) => c.id === it.chapterId) : null);
@@ -213,9 +234,9 @@ function studyCard(M, S) {
   return card({
     cls: 'study-card', id: 'today-study', title: 'Today’s study', icon: 'book', sub: d ? d.label + ' · ' + (d.ramp ? d.ramp.name : d.phase) : 'Outside the plan',
     actions: S.total ? html`<span class="row" style="gap:8px">${ring(S.done / S.total, { size: 36, stroke: 4, label: S.done + ' of ' + S.total + ' study tasks done' })}<span class="small"><b>${S.done}</b> / ${S.total}</span></span>` : '',
-    body: S.total || S.also.length ? html`${goal}${S.groups.length ? html`<div class="sd-groups">${S.groups.map(grp)}</div>` : empty('No study planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'book')}
-      ${S.also.length ? html`<div class="sd-also"><span class="lbl">Also today</span><ul>${S.also.map((it) => checkRow(M, it, { brief: true }))}</ul></div>` : ''}` : empty('Nothing planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'calcheck'),
-    foot: html`${M.overdueCount ? html`<a class="chip bad" href="#/subjects?flag=overdue">${icon('alert')}${plural(M.overdueCount, 'chapter')} overdue</a>` : ''}<span class="grow"></span><a class="btn sm ghost" href="#/study-plan">Mission briefing${icon('arrowR')}</a>`
+    body: S.total || S.also.length ? html`${rescue(M)}${goal}${S.groups.length ? html`<div class="sd-groups">${S.groups.map(grp)}</div>` : empty('No study planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'book')}
+      ${S.also.length ? html`<div class="sd-also"><span class="lbl">Also today</span><ul>${S.also.map((it) => checkRow(M, it, { brief: true }))}</ul></div>` : ''}` : html`${rescue(M)}${empty('Nothing planned for today.', html`<a class="btn sm" href="#/study-plan">Open the plan</a>`, 'calcheck')}`,
+    foot: html`${M.overdueCount ? html`<a class="chip bad" href="#/subjects?flag=overdue">${icon('alert')}See the ${plural(M.overdueCount, 'overdue chapter')}</a>` : ''}<span class="grow"></span><a class="btn sm ghost" href="#/study-plan">Mission briefing${icon('arrowR')}</a>`
   });
 }
 function logCard(M) {

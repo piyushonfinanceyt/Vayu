@@ -66,6 +66,22 @@
 .sd-also ul { display: flex; flex-wrap: wrap; gap: 0 28px; margin-top: 4px; }
 .sd-also .check { border-top: 0; padding: 6px 0; align-items: center; }
 @media (max-width: 600px) { .sd-goal { grid-template-columns: minmax(0, 1fr); } .sd-goal-n { text-align: left; } }
+/* overdue rescue: the catch-up planner's answer at the top of Today's study (amber when the dates don't fit) */
+.sd-rescue { margin-bottom: 14px; align-items: center; flex-wrap: wrap; border-color: var(--line-2); }
+.sd-rescue > svg.ic { flex: none; width: 20px; height: 20px; align-self: flex-start; margin-top: 1px; color: var(--bad); }
+.sd-rescue.warn { background: var(--warn-bg); border-color: transparent; }
+.sd-rescue.warn > svg.ic { color: var(--warn); }
+.sd-rescue > .grow { flex: 1 1 220px; }
+.sd-rescue p { margin: 0; }
+.sd-rescue b { font-weight: 500; }
+.sd-say { font-size: 13.5px; color: var(--ink-2); }
+.sd-land { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; }
+.notice .grow p.sd-land { margin-top: 9px; }
+.sd-land > span:not(.lbl) { padding: 2px 9px; border-radius: 999px; background: var(--soft-2); color: var(--ink-2); }
+.sd-rescue.warn .sd-land > span:not(.lbl) { background: var(--surface); }
+.sd-land > span b { color: var(--ink); }
+.sd-rescue-act { flex: none; display: flex; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+@media (max-width: 600px) { .sd-rescue-act { margin-left: 32px; } }
 .rank-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rank-tiles .tile { text-decoration: none; color: var(--ink); gap: 6px; transition: transform .2s var(--ease), border-color .2s; }
 .rank-tiles .tile.hero { color: var(--on-hero); }

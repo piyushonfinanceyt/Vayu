@@ -9,12 +9,37 @@
    - Otherwise reflow: every unfinished chapter is laid out again in the plan's order (subject runs stay together).
      When they can't all fit by the deadline, the lowest priority ones slip past it first (LOW, then MEDIUM; the
      latest-planned first) into the revision days after it, at half capacity. A day is filled until its capacity is
-     used; one chapter may run it over by up to a quarter. */
-import { now, sortBy, sum } from './util.js';
+     used; one chapter may run it over by up to a quarter.
+   applyReplan / resetReplan write the dates (or put the original ones back). They're global actions, so Study Plan's
+   Catch up card and the Dashboard's overdue rescue both use them. */
+import { now, sortBy, sum, plural, fmtDS } from './util.js';
+import { pref } from './prefs.js';
+import { model } from './model.js';
+import * as store from './store.js';
+import { toast, confirm } from './components.js';
 
 const PRIO = { LOW: 0, MEDIUM: 1, HIGH: 2 };
 const prio = (c) => (PRIO[c.priority] != null ? PRIO[c.priority] : 1);
 export const PACES = [[1, 'Plan pace'], [0.85, '85%'], [0.7, '70%'], [0.55, '55%']];
+// the pace you picked in Catch up (saved on this device)
+export const paceNow = () => { const p = +pref('replanPace', 1); return PACES.some((x) => x[0] === p) ? p : 1; };
+
+export async function applyReplan() {
+  const R = replan(model(), paceNow());
+  if (!R.moves.length) { toast('Nothing to move'); return; }
+  const prev = {};
+  R.moves.forEach((m) => { const ov = store.S.chapters[m.id]; prev[m.id] = (ov && ov.movedTo) || null; });
+  await store.saveSnapshot('pre-replan-' + Date.now(), 'Before the catch-up replan');
+  store.batch(() => R.moves.forEach((m) => store.setRec('chapters', m.id, 'movedTo', m.to === m.plan ? null : m.to)));
+  toast(plural(R.moves.length, 'chapter') + ' moved · R1 finishes ' + fmtDS(R.finish), { icon: 'calcheck', ms: 7000, action: { label: 'Undo', fn: () => store.batch(() => Object.keys(prev).forEach((id) => store.setRec('chapters', id, 'movedTo', prev[id]))) } });
+}
+export async function resetReplan() {
+  const ids = Object.keys(store.S.chapters).filter((id) => store.S.chapters[id] && store.S.chapters[id].movedTo);
+  if (!ids.length) return;
+  if (!(await confirm({ title: 'Back to the original plan?', body: plural(ids.length, 'chapter') + ' go back to the dates in your plan. Anything planned before today will show as overdue again.', ok: 'Use the original dates' }))) return;
+  store.batch(() => ids.forEach((id) => store.setRec('chapters', id, 'movedTo', null)));
+  toast('Back to the original plan');
+}
 
 export function replan(M, pace) {
   const t = M.t, deadline = M.st.syllabusDeadline;
