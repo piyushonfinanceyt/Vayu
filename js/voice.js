@@ -6,7 +6,7 @@
    - Greeting: "Hellooo, Piyush!" when the app opens or comes back into view (at most every 3 hours), with a line on
      where the day stands. The first one each day is the daily briefing: the date, the day of the journey and the
      countdown, today's goal, each study block still to do with its chapters, the workout, overdue chapters, how far
-     you've got and what to do right now. "Brief me" (Today's study, hold +, the command palette, P) reads it again.
+     you've got and what to do right now. "Brief me" (Today's study, hold +, the command palette, V) reads it again.
    - Reactions, right after you tick or log something: a chapter done (and how many are left), an R2 / R3 tick, a quest
      or task done, every study task done, the hours target, the workout, steps / push-ups / pages / meals, mock marks
      against the target, a mistake logged or fixed, new catch-up dates, a deep focus session started or finished,

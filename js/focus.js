@@ -19,7 +19,7 @@ import { model } from './model.js';
 const C = 2 * Math.PI * 120;
 let el = null, lock = null, setup = null;
 
-const weekBySubject = (t) => {
+export const weekBySubject = (t) => {
   const from = mondayOf(t), out = { '': 0 };
   store.list('sessions').filter((s) => s.date >= from && s.date <= t).forEach((s) => { const k = s.subject || ''; out[k] = (out[k] || 0) + (+s.minutes || 0); });
   return out;
@@ -119,7 +119,12 @@ async function onClick(e) {
   }
   if (a === 'done') { leave(); return; }
   if (a === 'break') { leave(); timer.reset('short'); timer.start(); toast('5-minute break started', { icon: 'timer' }); return; }
-  if (a === 'again') { const f = b.dataset.f ? JSON.parse(b.dataset.f) : {}; leave(); openSetup(f); return; }
+  if (a === 'again') {
+    const f = b.dataset.f ? JSON.parse(b.dataset.f) : {}; leave();
+    // in Hyper study the timer is on screen: go again straight away, same paper and length
+    if (document.body.classList.contains('hyper-on')) { timer.startFocus(+f.minutes || 50, f.kind === 'subject' ? { kind: 'subject', subject: f.subject, chapterId: f.chapterId || null } : { kind: 'general' }); return; }
+    openSetup(f); return;
+  }
   if (a === 'rev-done') { store.setRec('chapters', b.dataset.id, b.dataset.field, true); b.closest('.fx-ch').innerHTML = '<p class="fx-ok">' + icon('checkCircle') + esc(b.dataset.round) + ' marked done</p>'; return; }
   if (a === 'ch-done' || a === 'ch-prog') { store.setRec('chapters', b.dataset.id, 'status', a === 'ch-done' ? 'done' : 'progress'); b.closest('.fx-ch').innerHTML = '<p class="fx-ok">' + icon('checkCircle') + (a === 'ch-done' ? 'Marked done' : 'Marked in progress') + '</p>'; }
 }
@@ -144,3 +149,6 @@ timer.onFocusComplete((rec, s, full) => {
 // a reload, or tapping the timer, while a deep focus session is on brings the screen back
 export const active = () => { const s = timer.state(); return !!s.deep && (timer.running() || s.remaining != null); };
 export function resume() { if (active()) enter(); }
+// Hyper study (P) takes over the screen: the session keeps running there
+export const shown = () => !!el;
+export function hide() { leave(); }

@@ -1,6 +1,7 @@
 /* Boot and global event handling: storage → store → shell → router, one delegated listener per event type,
    data binding for plan records (data-bind="sec|id|field|type"), keyboard shortcuts, live countdown seconds,
-   XP / level / badge celebrations, and the voice (voice.js: greeting, daily briefing, praise; Brief me · P). */
+   XP / level / badge celebrations, the voice (voice.js: greeting, daily briefing, praise; Brief me · V) and
+   Hyper study mode (hyper.js: one full screen with the timer, subjects, today and the days left · P). */
 import * as store from './store.js';
 import { model } from './model.js';
 import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now, nowMin } from './util.js';
@@ -24,6 +25,7 @@ import { contentOn } from './content.js';
 import { whatNow, revisionItem } from './whatnow.js';
 import * as widgets from './widgets.js';
 import * as voice from './voice.js';
+import * as hyper from './hyper.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
@@ -36,6 +38,8 @@ function runNow(it) {
 }
 // the voice (voice.js): "Brief me" always speaks; the switch turns the greeting, briefing and praise on or off
 const briefMe = () => { if (!voice.supported()) { toast('This browser can’t speak. Try Chrome or Edge.', { tone: 'warn' }); return; } voice.brief(); };
+// Hyper study (P): one full screen for studying; from the deep focus screen it takes over the running session
+const toggleHyper = () => { if (focus.shown()) { focus.hide(); hyper.open(); } else hyper.toggle(); };
 const toggleVoice = () => {
   voice.set('voiceOn', !voice.on());
   toast(voice.on() ? 'Voice on · greeting, praise and the daily briefing' : 'Voice off · Brief me still reads the day out', { icon: voice.on() ? 'volume' : 'volumeX', ms: 2200 });
@@ -43,7 +47,8 @@ const toggleVoice = () => {
 };
 const commands = () => [
   { label: 'What now?', hint: 'The best thing to do right now', icon: 'zap', fn: () => runNow(whatNow(model(), nowMin()).top) },
-  { label: 'Brief me about today', hint: 'Voice · today’s goal, blocks and what’s next · P', icon: 'volume', fn: briefMe },
+  { label: 'Brief me about today', hint: 'Voice · today’s goal, blocks and what’s next · V', icon: 'volume', fn: briefMe },
+  { label: hyper.isOpen() ? 'Leave Hyper study' : 'Hyper study mode', hint: 'Full screen · timer, subjects, today’s goal, days left · P', icon: 'maximize', fn: toggleHyper },
   voice.supported() ? { label: voice.on() ? 'Turn the voice off' : 'Turn the voice on', hint: 'Greeting, praise and the daily briefing on this device', icon: voice.on() ? 'volumeX' : 'volume', fn: toggleVoice } : null,
   { label: 'Fill in tonight’s 10 PM log', hint: 'Quick log · L', icon: 'logbook', fn: () => openQuickLog() },
   { label: 'Start deep focus', hint: 'Full screen · one paper, one chapter or general study', icon: 'target', fn: () => focus.openSetup() },
@@ -68,10 +73,11 @@ export const GLOBAL = {
   focus: (el) => focus.openSetup(el && el.dataset && el.dataset.subject ? { kind: 'subject', subject: el.dataset.subject, chapterId: el.dataset.chapter || '' } : undefined),
   theme: toggleTheme,
   more: (el) => moreMenu(el),
-  'more-sheet': () => moreSheet({ palette: GLOBAL.palette, timer: GLOBAL.timer, theme: toggleTheme }),
+  'more-sheet': () => moreSheet({ palette: GLOBAL.palette, timer: GLOBAL.timer, theme: toggleTheme, hyper: toggleHyper }),
   notifications: (el) => notifications(el, model()),
   profile: (el) => profileMenu(el, model(), { shortcuts: shortcutsHelp, theme: toggleTheme, install: pwa.state.installEvent ? () => pwa.install() : null, voice: voice.supported() ? { on: voice.on(), fn: toggleVoice } : null }),
   brief: briefMe,
+  hyper: toggleHyper,
   'voice-toggle': toggleVoice,
   'go-errors': () => go('#/errors'),
   shortcuts: shortcutsHelp,
@@ -96,6 +102,7 @@ const QUICK = {
   marks: () => go('#/mocks'),
   mistake: () => go('#/errors?add=1'),
   card: () => openCardForm(null, {}),
+  hyper: toggleHyper,
   brief: briefMe
 };
 let holdT = 0, held = false, holdAt = null;
@@ -176,6 +183,11 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && menuOpen()) { closeMenu(); return; }
   if (inField || e.ctrlKey || e.metaKey || e.altKey || modalOpen() || paletteOpen() || document.body.classList.contains('modal-open')) return;
   const k = e.key.toLowerCase();
+  // in Hyper study: Esc leaves, Space starts or pauses the timer (unless a button or link has the focus)
+  if (hyper.isOpen() && !focus.shown() && !gPending) {
+    if (e.key === 'Escape') { e.preventDefault(); hyper.close(); return; }
+    if (e.key === ' ' && !tgt.closest('button, a, summary, [role="checkbox"]')) { e.preventDefault(); hyper.toggleTimer(); return; }
+  }
   if (gPending) {
     clearTimeout(gPending); gPending = 0;
     const to = { d: 'dashboard', p: 'study-plan', l: 'log', m: 'mocks', s: 'subjects', a: 'analytics', w: 'winter-arc', c: 'calendar' }[k];
@@ -186,7 +198,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/') { e.preventDefault(); GLOBAL.palette(); }
   else if (k === 'l') { e.preventDefault(); openQuickLog(); }
   else if (k === 't') { e.preventDefault(); toggleTheme(); }
-  else if (k === 'p' || k === 'v') { e.preventDefault(); if (voice.speaking()) voice.stop(); else briefMe(); }   // P (V still works): Brief me, again to stop
+  else if (k === 'p') { e.preventDefault(); toggleHyper(); }   // Hyper study mode, again to leave
+  else if (k === 'v') { e.preventDefault(); if (voice.speaking()) voice.stop(); else briefMe(); }   // Brief me, again to stop
   else if (e.key === '?') { e.preventDefault(); shortcutsHelp(); }
   else if (e.key === '[' || e.key === ']') { const v = currentView(); if (v && v.step) { e.preventDefault(); v.step(e.key === ']' ? 1 : -1, current().q); } }
 });
@@ -255,7 +268,7 @@ async function boot() {
   if (!location.hash) history.replaceState(null, '', location.pathname + location.search + '#/dashboard');
   await onRoute();
   deepAction();
-  focus.resume();   // a deep focus session survives a reload
+  if (pref('hyper')) hyper.open(); else focus.resume();   // Hyper study and a deep focus session survive a reload
   checkRelease();
   navNews();
   celebrate();
