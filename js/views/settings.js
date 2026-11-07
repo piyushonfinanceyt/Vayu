@@ -9,7 +9,7 @@ import * as sync from '../sync.js';
 import { go } from '../router.js';
 import { icon } from '../icons.js';
 import { card, chip, status, seg, toast, confirm, form } from '../components.js';
-import { themePref, setTheme, PALETTES, palettePref, setPalette, setPref } from '../prefs.js';
+import { themePref, setTheme, PALETTES, palettePref, setPalette, setPref, isOpen } from '../prefs.js';
 import { renderSoon } from '../router.js';
 import { ROUTES, routeById, navTabs, navBar, buildShell } from '../shell.js';
 import * as store from '../store.js';
@@ -57,20 +57,30 @@ function reminderCard() {
 // the voice (voice.js): on / off, which voice, its speed, what it does, and a test
 function voiceCard() {
   if (!voice.supported()) return card({ id: 'voice-card', title: 'Voice', icon: 'volume', actions: chip('Not available'), body: html`<p class="small">This browser can’t speak. Chrome, Edge and Safari can.</p>` });
-  const on = voice.on(), list = voice.voiceList(), cur = voice.currentVoice(), anyFemale = list.some((v) => voice.female(v) === true);
+  const on = voice.on(), all = voice.allVoices(), cur = voice.currentVoice();
+  const here = all.filter(voice.isLocal), net = all.filter((v) => !voice.isLocal(v));
   const tog = (act, label, v) => html`<button type="button" class="tog" data-act="${act}" aria-pressed="${String(v)}">${label}</button>`;
-  const vName = (v) => v.name.replace(/^Microsoft\s+/, '').replace(/\s+-\s+/, ' · ') + (v.localService === false ? ' · online' : '');
+  // each voice: Listen plays a sample in it and changes nothing; Use makes it hers
+  const row = (v) => {
+    const inUse = !!cur && v.name === cur.name, g = voice.female(v), nm = voice.shortName(v);
+    return html`<li class="${inUse ? 'in-use' : ''}"><span class="li-main"><b>${nm}</b><small>${[g === true ? 'Female' : g === false ? 'Male' : '', voice.accent(v)].filter(Boolean).join(' · ')}</small></span>
+      <span class="vrow-act"><button type="button" class="btn sm ghost" data-act="voice-listen" data-name="${v.name}" aria-label="Listen to ${nm}">${icon('play')}Listen</button>${inUse ? chip('In use', 'ink') : html`<button type="button" class="btn sm" data-act="voice-use" data-name="${v.name}" aria-label="Use ${nm} from now on">Use</button>`}</span></li>`;
+  };
   return card({
     id: 'voice-card', title: 'Voice', icon: 'volume', sub: 'Greets you, briefs you on the day and cheers what you finish',
     actions: on ? chip('On', 'ink') : chip('Off'),
-    body: html`<div class="row wrap">${tog('voice-on', on ? 'Voice on' : 'Turn the voice on', on)}${tog('voice-online', 'Online voices too', voice.online())}</div>
-      <div class="fields voice-fields" style="margin-top:14px">
-        <label class="field"><span>Voice</span><select class="in" id="voice-pick" data-change="voice-pick">${list.length ? list.map((v) => html`<option value="${v.name}" ${raw(cur && v.name === cur.name ? 'selected' : '')}>${vName(v)}</option>`) : html`<option value="">Your browser’s own voice</option>`}</select></label>
-        <div class="field"><span>Speed</span>${seg('voice-rate', [['0.9', 'Slower'], ['1', 'Normal'], ['1.12', 'Faster']], String(voice.rate()), { label: 'Speed' })}</div>
-      </div>
+    body: html`<div class="row wrap">${tog('voice-on', on ? 'Voice on' : 'Turn the voice on', on)}</div>
+      <h3 class="sub-h">Her voice</h3>
+      <p class="small muted">Tap <b>Listen</b> to hear a voice first. Nothing changes until you tap <b>Use</b>.</p>
+      <h4 class="vlist-h">On this device · ${here.length}</h4>
+      ${here.length ? html`<ul class="list vlist">${here.map(row)}</ul>` : html`<p class="small">No voices are installed on this device, so she uses your browser’s own voice.</p>`}
+      ${net.length ? html`<details class="grp vmore" data-key="voice-online" ${raw(isOpen('voice-online') || (cur && !voice.isLocal(cur)) ? 'open' : '')}><summary><b>Online voices · ${net.length}</b><span class="muted small">More natural · the browser sends what she says to its speech service</span></summary><div class="grp-body"><ul class="list vlist">${net.map(row)}</ul></div></details>`
+        : html`<p class="small muted vlist-none">This browser has no online voices. Microsoft Edge has the most natural ones (Neerja, Aria, Jenny, Sonia…), and Chrome has Google’s.</p>`}
+      <div class="field" style="margin-top:16px"><span>Speed</span>${seg('voice-rate', [['0.9', 'Slower'], ['1', 'Normal'], ['1.12', 'Faster']], String(voice.rate()), { label: 'Speed' })}</div>
       <div class="field" style="margin-top:14px"><span>What she does</span><div class="row wrap">${tog('voice-greet', 'Greets you', voice.opt('Greet'))}${tog('voice-brief', 'Daily briefing', voice.opt('Brief'))}${tog('voice-praise', 'Praise and reactions', voice.opt('Praise'))}</div></div>
-      <div class="row wrap" style="margin-top:14px"><button type="button" class="btn sm" data-act="voice-test">${icon('volume')}Say hello</button><button type="button" class="btn sm" data-act="brief">${icon('calcheck')}Brief me now</button></div>
-      <p class="hint">The briefing plays the first time you open the app each day, and the greeting at most every 3 hours after that. Browsers only let a page speak after you tap it, so she starts on your first tap. ${anyFemale ? '' : 'No female voice is installed on this device: on Windows, open Settings → Time & language → Speech → Add voices and add English (India) for Heera, or turn on online voices. '}Online voices sound more natural, but the browser sends the words to its speech service; voices on this device keep everything here. Saved on this device.</p>`
+      <div class="row wrap" style="margin-top:14px"><button type="button" class="btn sm" data-act="brief">${icon('calcheck')}Brief me now</button></div>
+      <p class="hint"><b>More voices.</b> On Windows: Settings → Time &amp; language → Speech → Add voices. English (United Kingdom) adds Hazel and Susan, English (Australia) Catherine, English (Canada) Linda. On Android: Settings → Text-to-speech → Speech Services by Google → Install voice data → English (India), which has several women’s voices. Reopen the app afterwards and they appear here.</p>
+      <p class="hint">The briefing plays the first time you open the app each day, and the greeting at most every 3 hours after that. Browsers only let a page speak after you tap it, so she starts on your first tap. Voices on this device keep everything here. Saved on this device.</p>`
   });
 }
 
@@ -150,7 +160,6 @@ export default {
   },
   segs: { theme: (v) => setTheme(v), 'voice-rate': (v) => { voice.set('voiceRate', +v || 1); voice.say('This is my ' + (+v < 1 ? 'slower' : +v > 1 ? 'faster' : 'normal') + ' speed.', 'greet'); } },
   changes: {
-    'voice-pick': (el) => { voice.set('voiceName', el.value); voice.hello(); },
     'nav-bar': (el) => {
       const b = navBar(), i = +el.dataset.i, v = el.value, j = b.indexOf(v);
       if (j >= 0 && j !== i) b[j] = b[i];   // already in another slot: the two swap
@@ -185,8 +194,14 @@ export default {
     'voice-greet': () => voice.set('voiceGreet', !voice.opt('Greet')),
     'voice-brief': () => voice.set('voiceBrief', !voice.opt('Brief')),
     'voice-praise': () => voice.set('voicePraise', !voice.opt('Praise')),
-    'voice-online': () => voice.set('voiceOnline', !voice.online()),
-    'voice-test': () => voice.hello(),
+    'voice-listen': (el) => voice.preview(el.dataset.name),
+    'voice-use': (el) => {
+      const name = el.dataset.name, v = voice.allVoices().find((x) => x.name === name);
+      voice.use(name);
+      toast('Her voice is now ' + (v ? voice.shortName(v) : 'changed'), { icon: 'volume', ms: 1800 });
+      // the Use button becomes "In use": keep the keyboard on that row
+      setTimeout(() => { const b = document.querySelector('[data-act="voice-listen"][data-name="' + CSS.escape(name) + '"]'); if (b) b.focus(); }, 160);
+    },
     'area-add': () => openArea(null),
     'area-edit': (el) => openArea(el.dataset.id),
     'reset-all': async () => {

@@ -1,7 +1,8 @@
 /* Voice: a female voice that greets you, briefs you on the day and reacts to what you do. Per device, Settings → Voice.
    - Speaks with the browser's own speech (Web Speech API). Only voices installed on this device by default, so the
      words never leave it; online voices (better sound, but the browser sends the words to its speech service) are
-     opt-in. Picks a female English voice (Indian English first, then British, then any) or the one chosen in Settings.
+     opt-in. Picks a female English voice (Indian English first, then British, then any) or the one chosen in Settings,
+     where every voice can be heard first (Listen) before it replaces the one in use (Use).
    - Greeting: "Hellooo, Piyush!" when the app opens or comes back into view (at most every 3 hours), with a line on
      where the day stands. The first one each day is the daily briefing: the date, the day of the journey and the
      countdown, today's goal, each study block still to do with its chapters, the workout, overdue chapters, how far
@@ -36,7 +37,7 @@ const changed = () => subs.forEach((f) => { try { f(); } catch (e) { console.err
 export function set(key, value) { setPref(key, value); if (key === 'voiceOn' && !value) stop(); changed(); }
 
 // ---------- voices ----------
-const FEM = /\b(zira|heera|neerja|aria|jenny|michelle|ana|sonia|libby|maisie|natasha|clara|emily|hazel|susan|catherine|linda|eva|samantha|karen|moira|tessa|fiona|veena|victoria|allison|ava|serena|kate|isha|lekha|swara|kalpana|aditi|raveena|priya|female|zoe|joanna|salli|kimberly|kendra|ivy|amy|emma|olivia|sara|nicky|martha|kiri|yasmin|aashi|jenna|ellie|ananya)\b/i;
+const FEM = /\b(zira|heera|neerja|aria|jenny|michelle|ana|sonia|libby|maisie|natasha|clara|emily|hazel|susan|catherine|linda|eva|samantha|karen|moira|tessa|fiona|veena|victoria|allison|ava|serena|kate|isha|lekha|swara|kalpana|aditi|raveena|priya|female|zoe|joanna|salli|kimberly|kendra|ivy|amy|emma|olivia|sara|nicky|martha|kiri|yasmin|aashi|jenna|ellie|ananya|molly|leah|luna|nancy|jane|elizabeth|abbie|bella|hollie|ashley|cora|monica|elsie|nova|amber|imani|ezinne|asilia|rehema|mia|kavya|rosa|yan|sapna)\b/i;
 const MALE = /\b(david|mark|ravi|guy|george|james|daniel|alex|fred|rishi|prabhat|brian|ryan|thomas|christopher|eric|roger|male|aaron|arthur|gordon|oliver|reed|rocko|grandpa|ralph|albert|hemant|kunal|william|liam|andrew|brandon|davis|jason|tony|steffan|connor|mitchell|matthew|joey|justin|kevin|russell|sean|prakash|madhur)\b/i;
 let voices = [];
 function loadVoices() {
@@ -46,20 +47,43 @@ function loadVoices() {
 }
 if (synth) { loadVoices(); if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices); else synth.onvoiceschanged = loadVoices; }
 const langOf = (v) => String(v.lang || '').toLowerCase().replace('_', '-');
-export const female = (v) => (FEM.test(v.name) ? true : MALE.test(v.name) ? false : null);
+export const female = (v) => (FEM.test(v.name) || /^Google (US English|हिन्दी)$/.test(v.name) ? true : MALE.test(v.name) ? false : null);
 const local = (v) => v.localService !== false;
+export const isLocal = local;
+const english = (v) => /^en(-|$)/.test(langOf(v));
 function score(v) {
   const l = langOf(v), f = female(v);
-  return (f === true ? 20 : f === false ? -20 : 0) + (l === 'en-in' ? 6 : l === 'en-gb' ? 3 : 1) + (/natural|neural|enhanced|premium/i.test(v.name) ? 4 : 0) + (local(v) ? 1 : 0) + (v.default ? 1 : 0);
+  return (f === true ? 20 : f === false ? -20 : 0) + (l === 'en-in' ? 6 : l === 'en-gb' ? 3 : english(v) ? 1 : 0) + (/natural|neural|enhanced|premium/i.test(v.name) ? 4 : 0) + (local(v) ? 1 : 0) + (v.default ? 1 : 0);
 }
-// the English voices this device can use, the best female voice first
-export function voiceList() {
+// every English (and Hindi) voice this browser has, on this device or online, the best female voice first
+export function allVoices() {
   loadVoices();
-  return voices.filter((v) => /^en(-|$)/.test(langOf(v)) && (local(v) || online())).sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
+  return voices.filter((v) => /^(en|hi)(-|$)/.test(langOf(v))).sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name));
 }
+// the ones she may speak with: this device's, and online ones once you've picked one
+export const voiceList = () => allVoices().filter((v) => local(v) || online());
+// the voice you picked, or the best female English voice
 export function currentVoice() {
   const list = voiceList(), want = pref('voiceName', '');
-  return (want && list.find((v) => v.name === want)) || list[0] || null;
+  return (want && list.find((v) => v.name === want)) || list.find(english) || list[0] || null;
+}
+const ACCENT = { 'en-in': 'Indian English', 'en-gb': 'British English', 'en-us': 'American English', 'en-au': 'Australian English', 'en-ie': 'Irish English', 'en-ca': 'Canadian English', 'en-nz': 'New Zealand English', 'en-za': 'South African English', 'en-sg': 'Singapore English', 'en-ph': 'Philippine English', 'en-ng': 'Nigerian English', 'en-ke': 'Kenyan English', 'en-hk': 'Hong Kong English', 'en-tz': 'Tanzanian English', 'hi-in': 'Hindi (India), reads English with a Hindi accent' };
+export const accent = (v) => ACCENT[langOf(v)] || v.lang;
+// "Microsoft Heera - English (India)" → "Heera", "Microsoft Neerja Online (Natural) - English (India)" → "Neerja (natural)"
+export const shortName = (v) => String(v.name).replace(/^Microsoft\s+/, '').replace(/\s+Online\s+\(Natural\)/i, ' (natural)').replace(/\s+-\s+.*$/, '').trim() || v.name;
+const byName = (name) => allVoices().find((v) => v.name === name) || null;
+// a sample in that voice; nothing changes until you choose it
+export function preview(name) {
+  const v = byName(name); if (!v) return false;
+  const nm = firstName(model()), s = shortName(v).replace(' (natural)', '');
+  return say([{ text: 'Hellooo, ' + nm + '!', rate: 0.92, pitch: 1.2, voice: v }, { text: (/^[A-Z][a-z]+$/.test(s) ? 'I’m ' + s + '. ' : 'This is how I sound. ') + 'Brilliant work today: Audit Documentation is done, and that’s your hours target hit. Let’s keep going!', voice: v }], 'greet');
+}
+// from now on she speaks with this voice (an online one turns online voices on)
+export function use(name) {
+  const v = byName(name); if (!v) return;
+  setPrefs({ voiceName: v.name, voiceOnline: !local(v) });
+  changed();
+  say([{ text: 'Okay, ' + firstName(model()) + '! I’ll sound like this from now on.', voice: v }], 'greet');
 }
 
 // ---------- words that read well aloud ----------
@@ -121,7 +145,7 @@ function caption(text) {
   document.body.style.setProperty('--vc-h', cap.offsetHeight + 'px');
 }
 function utter(it) {
-  const u = new SpeechSynthesisUtterance(it.text), v = currentVoice();
+  const u = new SpeechSynthesisUtterance(it.text), v = it.voice || currentVoice();
   if (v) { u.voice = v; u.lang = v.lang; } else u.lang = 'en-IN';
   u.rate = Math.max(0.6, Math.min(1.6, rate() * (it.rate || 1)));
   u.pitch = it.pitch || 1.05;
@@ -138,6 +162,12 @@ function next() {
   it.u.onerror = (e) => {
     if (cur !== it) return;
     if (e && e.error === 'not-allowed') { const rest = [it].concat(queue); queue = []; cur = null; caption(''); tapped = false; gate(() => { queue = rest.concat(queue); setTimeout(next, 60); }); return; }
+    // an online voice that can't be reached (offline, say): the same line with the best voice on this device
+    const v = it.u.voice;
+    if (v && !local(v) && !it.retried && e && /network|synthesis|unavailable/.test(e.error || '')) {
+      const lv = allVoices().find((x) => local(x) && english(x)) || allVoices().find(local);
+      if (lv) { cur = null; clearTimeout(wd); queue.unshift(Object.assign({}, it, { voice: lv, retried: true, u: null })); next(); return; }
+    }
     done();
   };
   caption(it.text);
