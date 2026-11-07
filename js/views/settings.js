@@ -1,5 +1,6 @@
 /* Settings: theme (light / dark / system), profile, exam mode, plan dates, phase hours, habit targets, run goal,
    pass / target lines and each paper's checkpoint targets, XP rules and the level curve, timer lengths, life areas,
+   the voice (on / off, which voice, speed, greeting / briefing / praise; this device only),
    and "reset all data" behind a confirm step (a restore point is saved first).
    Every field writes a settings override; clear a box to go back to your plan's value. */
 import { html, raw, esc, fmtDS, fmtDY, plural, clamp, isDate, fmtClock, timeToMin } from '../util.js';
@@ -14,8 +15,9 @@ import { ROUTES, routeById, navTabs, navBar, buildShell } from '../shell.js';
 import * as store from '../store.js';
 import * as db from '../db.js';
 import { model as modelOf, AREA_SOURCES } from '../model.js';
+import * as voice from '../voice.js';
 
-let navOnEnter = false;
+let navOnEnter = false, voiceOnEnter = false;
 function field(label, path, type, val, attrs) {
   const shown = val == null ? '' : type === 'pct' ? Math.round(val * 1000) / 10 : val;
   return html`<label class="field"><span>${label}</span><input id="${'s-' + path.replace(/\./g, '-')}" class="in" type="${type === 'date' ? 'date' : type === 'text' ? 'text' : type === 'time' ? 'time' : 'number'}" ${raw(type === 'num' || type === 'pct' ? 'inputmode="decimal" step="any"' : '')} data-change="set" data-path="${path}" data-t="${type}" value="${shown}" ${raw(attrs || '')}></label>`;
@@ -49,6 +51,26 @@ function reminderCard() {
       <p class="small" style="margin-top:10px">${perm}</p>
       <div class="row wrap" style="margin-top:12px"><button type="button" class="btn sm" data-act="remind-test">${icon('bell')}Send a test reminder</button><button type="button" class="btn sm" data-act="remind-ics">${icon('calendar')}Add to my phone calendar</button></div>
       <p class="hint">A web app can only notify you while it’s open or running in the background: install it (Tools → Install) and leave it open, and the reminder arrives at ${fmtClock(timeToMin(R.time))}. For a reminder that fires even when the app is closed, add the daily calendar event: open the downloaded file on your phone and save it to your calendar. It repeats every day until 12 Jan.</p>`
+  });
+}
+
+// the voice (voice.js): on / off, which voice, its speed, what it does, and a test
+function voiceCard() {
+  if (!voice.supported()) return card({ id: 'voice-card', title: 'Voice', icon: 'volume', actions: chip('Not available'), body: html`<p class="small">This browser can’t speak. Chrome, Edge and Safari can.</p>` });
+  const on = voice.on(), list = voice.voiceList(), cur = voice.currentVoice(), anyFemale = list.some((v) => voice.female(v) === true);
+  const tog = (act, label, v) => html`<button type="button" class="tog" data-act="${act}" aria-pressed="${String(v)}">${label}</button>`;
+  const vName = (v) => v.name.replace(/^Microsoft\s+/, '').replace(/\s+-\s+/, ' · ') + (v.localService === false ? ' · online' : '');
+  return card({
+    id: 'voice-card', title: 'Voice', icon: 'volume', sub: 'Greets you, briefs you on the day and cheers what you finish',
+    actions: on ? chip('On', 'ink') : chip('Off'),
+    body: html`<div class="row wrap">${tog('voice-on', on ? 'Voice on' : 'Turn the voice on', on)}${tog('voice-online', 'Online voices too', voice.online())}</div>
+      <div class="fields voice-fields" style="margin-top:14px">
+        <label class="field"><span>Voice</span><select class="in" id="voice-pick" data-change="voice-pick">${list.length ? list.map((v) => html`<option value="${v.name}" ${raw(cur && v.name === cur.name ? 'selected' : '')}>${vName(v)}</option>`) : html`<option value="">Your browser’s own voice</option>`}</select></label>
+        <div class="field"><span>Speed</span>${seg('voice-rate', [['0.9', 'Slower'], ['1', 'Normal'], ['1.12', 'Faster']], String(voice.rate()), { label: 'Speed' })}</div>
+      </div>
+      <div class="field" style="margin-top:14px"><span>What she does</span><div class="row wrap">${tog('voice-greet', 'Greets you', voice.opt('Greet'))}${tog('voice-brief', 'Daily briefing', voice.opt('Brief'))}${tog('voice-praise', 'Praise and reactions', voice.opt('Praise'))}</div></div>
+      <div class="row wrap" style="margin-top:14px"><button type="button" class="btn sm" data-act="voice-test">${icon('volume')}Say hello</button><button type="button" class="btn sm" data-act="brief">${icon('calcheck')}Brief me now</button></div>
+      <p class="hint">The briefing plays the first time you open the app each day, and the greeting at most every 3 hours after that. Browsers only let a page speak after you tap it, so she starts on your first tap. ${anyFemale ? '' : 'No female voice is installed on this device: on Windows, open Settings → Time & language → Speech → Add voices and add English (India) for Heera, or turn on online voices. '}Online voices sound more natural, but the browser sends the words to its speech service; voices on this device keep everything here. Saved on this device.</p>`
   });
 }
 
@@ -118,12 +140,17 @@ export default {
     const data = card({ cls: 'span-5', title: 'Your data', icon: 'database', body: html`<p class="muted small">Stored in ${kind === 'indexeddb' ? 'IndexedDB' : kind === 'localstorage' ? 'browser storage' : 'memory only'} on this device. ${meta.migratedFrom || ''}. Set up on ${String(meta.initializedAt || '').slice(0, 10)}.</p>
       <div class="row wrap" style="margin-top:12px"><a class="btn sm" href="#/tools">${icon('database')}Backup and restore</a></div>
       <div class="danger-zone"><b>Reset all data</b><p class="small muted">Every log, goal, note, journal entry and setting on this device goes back to the original plan. A restore point is kept so you can undo it from Tools.</p><button type="button" class="btn danger" data-act="reset-all">${icon('trash')}Reset all data</button></div>` });
-    return html`<div class="grid">${profile}${examCard}</div>${navCard(exam)}${syncCard()}${reminderCard()}${plan}<div class="grid">${xpCard}${timerCard}</div><div class="grid">${areas}${data}</div>`;
+    return html`<div class="grid">${profile}${examCard}</div>${navCard(exam)}${syncCard()}${reminderCard()}${voiceCard()}${plan}<div class="grid">${xpCard}${timerCard}</div><div class="grid">${areas}${data}</div>`;
   },
-  enter(q) { navOnEnter = !!q.nav; },
-  after() { if (navOnEnter) { navOnEnter = false; const c = document.getElementById('nav-card'); if (c) setTimeout(() => c.scrollIntoView({ block: 'start' }), 60); } },
-  segs: { theme: (v) => setTheme(v) },
+  enter(q) { navOnEnter = !!q.nav; voiceOnEnter = !!q.voice; },
+  after() {
+    const to = navOnEnter ? 'nav-card' : voiceOnEnter ? 'voice-card' : '';
+    navOnEnter = voiceOnEnter = false;
+    const c = to && document.getElementById(to); if (c) setTimeout(() => c.scrollIntoView({ block: 'start' }), 60);
+  },
+  segs: { theme: (v) => setTheme(v), 'voice-rate': (v) => { voice.set('voiceRate', +v || 1); voice.say('This is my ' + (+v < 1 ? 'slower' : +v > 1 ? 'faster' : 'normal') + ' speed.', 'greet'); } },
   changes: {
+    'voice-pick': (el) => { voice.set('voiceName', el.value); voice.hello(); },
     'nav-bar': (el) => {
       const b = navBar(), i = +el.dataset.i, v = el.value, j = b.indexOf(v);
       if (j >= 0 && j !== i) b[j] = b[i];   // already in another slot: the two swap
@@ -154,6 +181,12 @@ export default {
     'remind-test': () => pwa.checkReminder(() => go('#/log'), true),
     'remind-ics': () => pwa.downloadCalendarReminder(),
     'exam-mode': () => store.setSetting('examMode', !store.settings().examMode),
+    'voice-on': () => { voice.set('voiceOn', !voice.on()); toast(voice.on() ? 'Voice on' : 'Voice off · Brief me still reads the day out', { icon: voice.on() ? 'volume' : 'volumeX', ms: 1800 }); if (voice.on()) voice.hello(); },
+    'voice-greet': () => voice.set('voiceGreet', !voice.opt('Greet')),
+    'voice-brief': () => voice.set('voiceBrief', !voice.opt('Brief')),
+    'voice-praise': () => voice.set('voicePraise', !voice.opt('Praise')),
+    'voice-online': () => voice.set('voiceOnline', !voice.online()),
+    'voice-test': () => voice.hello(),
     'area-add': () => openArea(null),
     'area-edit': (el) => openArea(el.dataset.id),
     'reset-all': async () => {

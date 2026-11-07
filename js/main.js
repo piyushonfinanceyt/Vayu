@@ -1,6 +1,6 @@
 /* Boot and global event handling: storage → store → shell → router, one delegated listener per event type,
    data binding for plan records (data-bind="sec|id|field|type"), keyboard shortcuts, live countdown seconds,
-   XP / level / badge celebrations. */
+   XP / level / badge celebrations, and the voice (voice.js: greeting, daily briefing, praise; Brief me · V). */
 import * as store from './store.js';
 import { model } from './model.js';
 import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now, nowMin } from './util.js';
@@ -23,6 +23,7 @@ import * as contentui from './contentui.js';
 import { contentOn } from './content.js';
 import { whatNow, revisionItem } from './whatnow.js';
 import * as widgets from './widgets.js';
+import * as voice from './voice.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
@@ -33,8 +34,17 @@ function runNow(it) {
   else if (it.setup) focus.openSetup();
   else if (it.href) go(it.href);
 }
+// the voice (voice.js): "Brief me" always speaks; the switch turns the greeting, briefing and praise on or off
+const briefMe = () => { if (!voice.supported()) { toast('This browser can’t speak. Try Chrome or Edge.', { tone: 'warn' }); return; } voice.brief(); };
+const toggleVoice = () => {
+  voice.set('voiceOn', !voice.on());
+  toast(voice.on() ? 'Voice on · greeting, praise and the daily briefing' : 'Voice off · Brief me still reads the day out', { icon: voice.on() ? 'volume' : 'volumeX', ms: 2200 });
+  if (voice.on()) voice.say('Hellooo, ' + (String(model().st.player || '').trim().split(/\s+/)[0] || 'there') + '! I’m back.', 'greet');
+};
 const commands = () => [
   { label: 'What now?', hint: 'The best thing to do right now', icon: 'zap', fn: () => runNow(whatNow(model(), nowMin()).top) },
+  { label: 'Brief me about today', hint: 'Voice · today’s goal, blocks and what’s next · V', icon: 'volume', fn: briefMe },
+  voice.supported() ? { label: voice.on() ? 'Turn the voice off' : 'Turn the voice on', hint: 'Greeting, praise and the daily briefing on this device', icon: voice.on() ? 'volumeX' : 'volume', fn: toggleVoice } : null,
   { label: 'Fill in tonight’s 10 PM log', hint: 'Quick log · L', icon: 'logbook', fn: () => openQuickLog() },
   { label: 'Start deep focus', hint: 'Full screen · one paper, one chapter or general study', icon: 'target', fn: () => focus.openSetup() },
   { label: 'Start the focus timer', hint: 'Pomodoro, Deep Work or a short break', icon: 'timer', fn: () => timer.open() },
@@ -42,7 +52,7 @@ const commands = () => [
   { label: 'Open today in the Study Plan', hint: 'Mission briefing', icon: 'calcheck', fn: () => go('#/study-plan') },
   { label: (resolvedTheme() === 'dark' ? 'Light' : 'Dark') + ' theme', hint: 'Theme · T', icon: resolvedTheme() === 'dark' ? 'sun' : 'moon', fn: toggleTheme },
   { label: 'Keyboard shortcuts', hint: '?', icon: 'keyboard', fn: shortcutsHelp }
-];
+].filter(Boolean);
 export const GLOBAL = {
   palette: () => openPalette(commands()),
   quicklog: (el) => openQuickLog(el && el.dataset && isDate(el.dataset.date) ? el.dataset.date : undefined),
@@ -60,7 +70,9 @@ export const GLOBAL = {
   more: (el) => moreMenu(el),
   'more-sheet': () => moreSheet({ palette: GLOBAL.palette, timer: GLOBAL.timer, theme: toggleTheme }),
   notifications: (el) => notifications(el, model()),
-  profile: (el) => profileMenu(el, model(), { shortcuts: shortcutsHelp, theme: toggleTheme, install: pwa.state.installEvent ? () => pwa.install() : null }),
+  profile: (el) => profileMenu(el, model(), { shortcuts: shortcutsHelp, theme: toggleTheme, install: pwa.state.installEvent ? () => pwa.install() : null, voice: voice.supported() ? { on: voice.on(), fn: toggleVoice } : null }),
+  brief: briefMe,
+  'voice-toggle': toggleVoice,
   'go-errors': () => go('#/errors'),
   shortcuts: shortcutsHelp,
   'plan-toggle': (el) => store.togglePlanTask(el.dataset.id, el.dataset.date, el.dataset.title, el.dataset.kind || 'plan'),
@@ -83,7 +95,8 @@ const QUICK = {
   focus: () => focus.openSetup(),
   marks: () => go('#/mocks'),
   mistake: () => go('#/errors?add=1'),
-  card: () => openCardForm(null, {})
+  card: () => openCardForm(null, {}),
+  brief: briefMe
 };
 let holdT = 0, held = false, holdAt = null;
 const openQuick = (b) => { held = true; clearTimeout(holdT); try { if (navigator.vibrate) navigator.vibrate(10); } catch (x) { /* no vibration */ } quickMenu(b, QUICK); };
@@ -173,6 +186,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/') { e.preventDefault(); GLOBAL.palette(); }
   else if (k === 'l') { e.preventDefault(); openQuickLog(); }
   else if (k === 't') { e.preventDefault(); toggleTheme(); }
+  else if (k === 'v') { e.preventDefault(); if (voice.speaking()) voice.stop(); else briefMe(); }
   else if (e.key === '?') { e.preventDefault(); shortcutsHelp(); }
   else if (e.key === '[' || e.key === ']') { const v = currentView(); if (v && v.step) { e.preventDefault(); v.step(e.key === ']' ? 1 : -1, current().q); } }
 });
@@ -222,6 +236,12 @@ function navNews() {
   setPref('navNews', 1);
   setTimeout(() => toast('New: section chips on long pages, your own shortcuts, and hold + for quick actions', { icon: 'sparkles', ms: 10000, action: { label: 'Set up', fn: () => go('#/settings?nav=1') } }), 1800);
 }
+// once per device: the voice is here
+function voiceNews() {
+  if (pref('voiceNews') || !voice.supported()) return;
+  setPref('voiceNews', 1);
+  setTimeout(() => toast('New: Vayu has a voice. She greets you, briefs you on the day and cheers what you finish.', { icon: 'volume', ms: 10000, action: { label: 'Voice settings', fn: () => go('#/settings?voice=1') } }), 2200);
+}
 
 // ---------- boot ----------
 async function boot() {
@@ -239,6 +259,10 @@ async function boot() {
   checkRelease();
   navNews();
   celebrate();
+  // the voice: greets on your first tap, briefs you once a day, cheers what you finish (Settings → Voice)
+  voice.onChange(() => { if (current() && current().id === 'settings') renderSoon(); });
+  voice.start();
+  voiceNews();
   document.body.classList.add('ready');
   if (kind === 'memory') { $('#banner').innerHTML = '<div class="banner" role="alert">This browser is blocking storage, so changes won’t survive a reload. Download a backup from Tools before closing.</div>'; }
   onSystemTheme(() => renderSoon());

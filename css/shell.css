@@ -126,6 +126,17 @@ a.tile:active, button.tile:active { transform: scale(.985); }
 .toast.warn .ic { color: var(--warn-mark); }
 .toast.bad .ic { color: var(--bad-mark); }
 .toast.good .ic { color: var(--good-mark); }
+/* the voice's caption (voice.js) sits where a toast would; while it shows, the toasts move up above it */
+.voicecap { position: fixed; z-index: 81; left: 12px; right: 12px; margin-inline: auto; bottom: 24px; display: flex; align-items: center; gap: 10px; width: max-content; max-width: min(560px, calc(100vw - 24px)); padding: 8px 8px 8px 14px; border-radius: 18px; background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); box-shadow: var(--shadow-pop); font-size: 13.5px; line-height: 1.4; animation: fade-up .25s var(--ease) both; }
+.voicecap[hidden] { display: none; }
+.voicecap > .ic { flex: none; width: 18px; height: 18px; color: var(--ink-2); }
+.voicecap .vc-t { flex: 1 1 auto; min-width: 0; }
+.vc-stop { flex: none; padding: 6px 12px; border-radius: var(--r-pill); background: var(--soft-2); color: var(--ink); font-weight: 500; font-size: 13px; }
+.vc-stop:hover { background: var(--line-2); }
+body.voice-on .toasts { transform: translate(-50%, calc(-10px - var(--vc-h, 44px))); }
+body.focus-on .voicecap { visibility: hidden; }
+@media (prefers-reduced-motion: no-preference) { .voicecap > .ic { animation: vc-pulse 1.4s ease-in-out infinite; } }
+@keyframes vc-pulse { 50% { opacity: .4; } }
 .banner { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-md); margin-top: 14px; background: var(--bad-bg); color: var(--bad); }
 
 /* ---------- installed app (standalone): keep clear of the status bar and the home indicator ---------- */
@@ -161,7 +172,7 @@ a.tile:active, button.tile:active { transform: scale(.985); }
   html:has(.jump) { scroll-padding-top: 120px; }
   .page-actions { gap: 6px; }
   .page-actions .btn { min-height: 38px; padding: 6px 11px; gap: 6px; font-size: 13px; }
-  .toasts { bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .toasts, .voicecap { bottom: calc(96px + env(safe-area-inset-bottom)); }
   .scrim { padding-top: 6vh; }
   .more-grid { grid-template-columns: 1fr; min-width: 0; }
 }

@@ -151,8 +151,9 @@ export function quickMenu(anchor, acts) {
     { label: 'Start deep focus', hint: 'One paper, one chapter or general', icon: 'target', fn: acts.focus },
     { label: 'Enter mock marks', hint: 'Mock Tests', icon: 'mocks', fn: acts.marks },
     { label: 'Log a lost mark', hint: 'Error Book', icon: 'alert', fn: acts.mistake },
-    { label: 'Make a flashcard', hint: 'Revision', icon: 'bookmark', fn: acts.card }
-  ], { cls: 'quick-pop', align: 'end' });
+    { label: 'Make a flashcard', hint: 'Revision', icon: 'bookmark', fn: acts.card },
+    acts.brief ? { label: 'Brief me', hint: 'Today, read out loud', icon: 'volume', fn: acts.brief } : null
+  ].filter(Boolean), { cls: 'quick-pop', align: 'end' });
 }
 export function moreSheet(actions) {
   const sheet = document.createElement('div');
@@ -188,13 +189,14 @@ export function profileMenu(anchor, M, actions) {
     { label: 'Backup and restore', icon: 'database', href: '#/tools' },
     actions.install ? { label: 'Install the app', hint: 'Opens offline, from your home screen', icon: 'install', fn: actions.install } : null,
     { label: 'Keyboard shortcuts', icon: 'keyboard', kbd: '?', fn: actions.shortcuts },
-    { label: (resolvedTheme() === 'dark' ? 'Light' : 'Dark') + ' theme', icon: resolvedTheme() === 'dark' ? 'sun' : 'moon', kbd: 'T', fn: actions.theme }
-  ], { align: 'end' });
+    { label: (resolvedTheme() === 'dark' ? 'Light' : 'Dark') + ' theme', icon: resolvedTheme() === 'dark' ? 'sun' : 'moon', kbd: 'T', fn: actions.theme },
+    actions.voice ? { label: actions.voice.on ? 'Turn the voice off' : 'Turn the voice on', hint: 'Greeting, praise and the daily briefing', icon: actions.voice.on ? 'volumeX' : 'volume', fn: actions.voice.fn } : null
+  ].filter(Boolean), { align: 'end' });
 }
 export function shortcutsHelp() {
   const row = (k, t) => '<li class="between" style="padding:8px 0;border-top:1px solid var(--line)"><span>' + esc(t) + '</span><span class="row" style="gap:4px">' + k.map((x) => '<span class="kbd">' + esc(x) + '</span>').join('') + '</span></li>';
   modal({ title: 'Keyboard shortcuts', body: raw('<ul>' + [
-    [['Ctrl', 'K'], 'Search and commands'], [['/'], 'Search'], [['L'], 'Quick log for today'], [['T'], 'Switch light / dark theme'],
+    [['Ctrl', 'K'], 'Search and commands'], [['/'], 'Search'], [['L'], 'Quick log for today'], [['T'], 'Switch light / dark theme'], [['V'], 'Brief me about today (again to stop)'],
     [['G', 'D'], 'Go to Dashboard'], [['G', 'P'], 'Go to Study Plan'], [['G', 'L'], 'Go to Daily Log'], [['G', 'M'], 'Go to Mock Tests'], [['G', 'S'], 'Go to Subjects'],
     [['['], 'Previous day (Plan, Log)'], [[']'], 'Next day (Plan, Log)'], [['←', '→'], 'Step through chart points'], [['Esc'], 'Close'], [['?'], 'This list']
   ].map((x) => row(x[0], x[1])).join('') + '</ul>') });

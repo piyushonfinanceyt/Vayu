@@ -541,6 +541,9 @@
 .ptargets .in { width: 72px; text-align: right; margin-left: auto; }
 .remind-row { display: flex; align-items: flex-end; gap: 12px 16px; flex-wrap: wrap; }
 .remind-row .field { width: 160px; }
+/* Settings → Voice: the voice and its speed side by side when there's room for both, stacked on a phone */
+.voice-fields { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.voice-fields .seg { justify-self: start; }
 .install-card { margin-bottom: 14px; }
 .sync-steps { counter-reset: step; display: grid; gap: 10px; margin-bottom: 16px; font-size: 13px; color: var(--ink-2); }
 .sync-steps li { counter-increment: step; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }
