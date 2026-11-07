@@ -551,6 +551,9 @@
 .vmore > summary { flex-wrap: wrap; row-gap: 2px; }
 .vlist-none { margin-top: 10px; }
 #voice-card .field > .seg { width: max-content; max-width: 100%; }
+/* the P key on the Brief me buttons: shown with a keyboard and mouse, hidden on a touch screen */
+.btn .kbd-hint { height: 18px; min-width: 18px; padding: 0 5px; border-radius: 5px; font-size: 10.5px; margin-left: 2px; }
+@media (hover: none), (pointer: coarse) { .btn .kbd-hint { display: none; } }
 .install-card { margin-bottom: 14px; }
 .sync-steps { counter-reset: step; display: grid; gap: 10px; margin-bottom: 16px; font-size: 13px; color: var(--ink-2); }
 .sync-steps li { counter-increment: step; display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; align-items: start; }

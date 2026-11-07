@@ -1,6 +1,6 @@
 /* Boot and global event handling: storage → store → shell → router, one delegated listener per event type,
    data binding for plan records (data-bind="sec|id|field|type"), keyboard shortcuts, live countdown seconds,
-   XP / level / badge celebrations, and the voice (voice.js: greeting, daily briefing, praise; Brief me · V). */
+   XP / level / badge celebrations, and the voice (voice.js: greeting, daily briefing, praise; Brief me · P). */
 import * as store from './store.js';
 import { model } from './model.js';
 import { $, $$, esc, plural, todayStr, debounce, isDate, addDays, now, nowMin } from './util.js';
@@ -43,7 +43,7 @@ const toggleVoice = () => {
 };
 const commands = () => [
   { label: 'What now?', hint: 'The best thing to do right now', icon: 'zap', fn: () => runNow(whatNow(model(), nowMin()).top) },
-  { label: 'Brief me about today', hint: 'Voice · today’s goal, blocks and what’s next · V', icon: 'volume', fn: briefMe },
+  { label: 'Brief me about today', hint: 'Voice · today’s goal, blocks and what’s next · P', icon: 'volume', fn: briefMe },
   voice.supported() ? { label: voice.on() ? 'Turn the voice off' : 'Turn the voice on', hint: 'Greeting, praise and the daily briefing on this device', icon: voice.on() ? 'volumeX' : 'volume', fn: toggleVoice } : null,
   { label: 'Fill in tonight’s 10 PM log', hint: 'Quick log · L', icon: 'logbook', fn: () => openQuickLog() },
   { label: 'Start deep focus', hint: 'Full screen · one paper, one chapter or general study', icon: 'target', fn: () => focus.openSetup() },
@@ -186,7 +186,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === '/') { e.preventDefault(); GLOBAL.palette(); }
   else if (k === 'l') { e.preventDefault(); openQuickLog(); }
   else if (k === 't') { e.preventDefault(); toggleTheme(); }
-  else if (k === 'v') { e.preventDefault(); if (voice.speaking()) voice.stop(); else briefMe(); }
+  else if (k === 'p' || k === 'v') { e.preventDefault(); if (voice.speaking()) voice.stop(); else briefMe(); }   // P (V still works): Brief me, again to stop
   else if (e.key === '?') { e.preventDefault(); shortcutsHelp(); }
   else if (e.key === '[' || e.key === ']') { const v = currentView(); if (v && v.step) { e.preventDefault(); v.step(e.key === ']' ? 1 : -1, current().q); } }
 });
