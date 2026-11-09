@@ -26,6 +26,7 @@ import { whatNow, revisionItem } from './whatnow.js';
 import * as widgets from './widgets.js';
 import * as voice from './voice.js';
 import * as hyper from './hyper.js';
+import * as feel from './feel.js';
 
 // ---------- global actions (views add their own in `actions`) ----------
 const toggleTheme = () => { setTheme(resolvedTheme() === 'dark' ? 'light' : 'dark'); renderSoon(); toast((resolvedTheme() === 'dark' ? 'Dark' : 'Light') + ' theme', { icon: resolvedTheme() === 'dark' ? 'moon' : 'sun', ms: 1400 }); };
@@ -202,7 +203,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'p') { e.preventDefault(); toggleHyper(); }   // Hyper study mode, again to leave
   else if (k === 'v') { e.preventDefault(); if (voice.speaking()) voice.stop(); else briefMe(); }   // Brief me, again to stop
   else if (e.key === '?') { e.preventDefault(); shortcutsHelp(); }
-  else if (e.key === '[' || e.key === ']') { const v = currentView(); if (v && v.step) { e.preventDefault(); v.step(e.key === ']' ? 1 : -1, current().q); } }
+  else if (e.key === '[' || e.key === ']') { if (feel.step(e.key === ']' ? 1 : -1)) e.preventDefault(); }
 });
 
 // ---------- live countdown seconds ----------

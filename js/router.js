@@ -65,14 +65,33 @@ export function prefetch() { Object.keys(VIEWS).forEach((k) => { if (!cache[k]) 
 export async function onRoute() {
   const r = parseHash(), changed = r.id !== cur.id;
   if (changed && cur.id) { const o = navOrder(), a = o.indexOf(cur.id), b = o.indexOf(r.id); dir = b > a ? 'fwd' : 'back'; } else dir = '';
+  // Back (or Forward, or a reload) to a page you've been on: back to where you were on it, not the top
+  const st = history.state, back = changed && st && typeof st.y === 'number' && st.h === location.hash ? st.y : null;
+  restoreY = back;
   cur = r;
   closeMenu();
   view = await load(r.id);
   if (view.enter) view.enter(r.q);
   render(changed ? 'enter' : 'query');
-  if (changed) { window.scrollTo(0, 0); const m = $('#main'); try { m.focus({ preventScroll: true }); } catch (e) { m.focus(); } }
+  if (changed) { if (back == null) window.scrollTo(0, 0); const m = $('#main'); try { m.focus({ preventScroll: true }); } catch (e) { m.focus(); } }
   setPref('lastRoute', r.id);
 }
+
+// ---------- where you were on each page: kept in that page's history entry, saved once scrolling stops ----------
+let restoreY = null, saveT = 0;
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.addEventListener('scroll', () => {
+  const h = location.hash;
+  clearTimeout(saveT);
+  saveT = setTimeout(() => {
+    if (location.hash !== h) return;   // already on another page
+    try { history.replaceState(Object.assign({}, history.state, { y: Math.round(window.scrollY), h }), ''); } catch (e) { /* too many calls in a row */ }
+  }, 250);
+}, { passive: true });
+
+// a day-by-day page stepping (swipe, [ or ]): the next draw slides in from that side
+let slideNext = '', slideT = 0;
+export function nudge(d) { slideNext = d > 0 ? 'fwd' : 'back'; clearTimeout(slideT); slideT = setTimeout(() => { slideNext = ''; }, 800); }
 
 // keep the field being typed in: the live element is moved into the new markup
 function withFocus(fn) {
@@ -129,7 +148,9 @@ export function render(mode) {
   resetSpecs();
   const body = String(view.render(M, cur.q));
   // without View Transitions the page itself slides in from the side you're moving towards
-  const slide = enter && !vt && dir && rendered && !reducedMotion() ? ' slide-' + dir : '';
+  let slide = enter && !vt && dir && rendered && !reducedMotion() ? ' slide-' + dir : '';
+  if (!enter && slideNext) { if (!reducedMotion()) slide = ' slide-' + slideNext; slideNext = ''; }
+  const ry = enter ? restoreY : null; if (enter) restoreY = null;
   const markup = head(M, r, view.head ? view.head(M, cur.q) : {}) + '<div class="page' + (enter ? ' anim' : '') + slide + '" data-view="' + r.id + '">' + body + '</div>';
   const main = $('#main'), y = window.scrollY, token = ++renderSeq;
   let applied = false;
@@ -142,10 +163,11 @@ export function render(mode) {
     drawAll(main, enter);
     if (view.after) { try { view.after(page, M, cur.q); } catch (e) { console.error(e); } }
     try { jump.build(main, r.id); } catch (e) { console.error(e); }
-    if (enter) revealBelowFold(page);
+    if (enter && ry == null) revealBelowFold(page);   // coming back mid-page, everything is already in place
     updateShell(M, r.id);
     document.title = (r.id === 'dashboard' ? '' : r.title + ' · ') + 'Vayu';
     if (!enter && window.scrollY !== y) window.scrollTo(0, y);
+    if (ry != null) window.scrollTo(0, Math.min(ry, document.documentElement.scrollHeight - innerHeight));   // last, once the page is complete
   };
   if (vt) {
     try {

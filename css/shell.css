@@ -135,6 +135,14 @@ a.tile:active, button.tile:active { transform: scale(.985); }
 .vc-stop:hover { background: var(--line-2); }
 body.voice-on .toasts { transform: translate(-50%, calc(-10px - var(--vc-h, 44px))); }
 body.focus-on .voicecap { visibility: hidden; }
+/* back to top (feel.js): bottom right once you're a couple of screens down a long page */
+.totop { position: fixed; z-index: 29; right: 24px; bottom: 24px; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); color: var(--ink); border: 1px solid var(--line-2); box-shadow: var(--shadow-pop); opacity: 0; transform: translateY(10px) scale(.88); pointer-events: none; transition: opacity .25s var(--ease), transform .3s var(--ease), translate .3s var(--ease), background .2s; }
+.totop.on { opacity: 1; transform: none; pointer-events: auto; }
+.totop:hover { background: var(--soft-2); }
+.totop:active { transform: scale(.92); }
+.totop svg { width: 20px; height: 20px; }
+body.voice-on .totop { translate: 0 calc(-10px - var(--vc-h, 44px)); }
+body.hyper-on .totop, body.focus-on .totop { visibility: hidden; }
 @media (prefers-reduced-motion: no-preference) { .voicecap > .ic { animation: vc-pulse 1.4s ease-in-out infinite; } }
 @keyframes vc-pulse { 50% { opacity: .4; } }
 .banner { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: var(--r-md); margin-top: 14px; background: var(--bad-bg); color: var(--bad); }
@@ -173,6 +181,7 @@ body.focus-on .voicecap { visibility: hidden; }
   .page-actions { gap: 6px; }
   .page-actions .btn { min-height: 38px; padding: 6px 11px; gap: 6px; font-size: 13px; }
   .toasts, .voicecap { bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .totop { right: 16px; bottom: calc(96px + env(safe-area-inset-bottom)); width: 44px; height: 44px; }
   .scrim { padding-top: 6vh; }
   .more-grid { grid-template-columns: 1fr; min-width: 0; }
 }

@@ -55,6 +55,7 @@ export const ICONS = {
     up: '<path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
     down: '<path d="m3 7 6 6 4-4 8 8"/><path d="M15 17h6v-6"/>',
     arrowR: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    arrowUp: '<path d="M12 19.5v-15M6 10.5l6-6 6 6"/>',
     arrowU: '<path d="M12 19V5M6 11l6-6 6 6"/>',
     arrowD: '<path d="M12 5v14M6 13l6 6 6-6"/>',
     external: '<path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/>',

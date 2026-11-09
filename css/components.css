@@ -53,6 +53,9 @@
 .chip.info { background: var(--info-bg); color: var(--info); }
 .chip.ink { background: var(--hero); color: var(--on-hero); }
 .chip.line { background: none; border: 1px solid var(--line-2); }
+/* a chip you can tap is small to look at but not to hit: the hit area reaches past it */
+a.chip, button.chip { position: relative; }
+a.chip::after, button.chip::after { content: ''; position: absolute; inset: -8px -3px; }
 .hero .chip { background: rgba(127, 127, 127, .24); color: var(--on-hero); }
 .hero .chip.good { background: var(--good-bg); color: var(--good); }
 .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--c, var(--ink-3)); }
