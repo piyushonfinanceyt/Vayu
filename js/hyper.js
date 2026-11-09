@@ -4,16 +4,20 @@
      timer as everywhere else (timer.js): the minutes go to today's study hours, and a finished session opens
      the usual completion screen on top (focus.js).
    - Subjects: the six papers with R1 chapters done and this week's focus time; the chosen paper's chapters
-     (today's first, then in progress, overdue and next) to tick off, or to aim the next session at.
-   - Today's goal: the day's hours against the target and its study to-do list (studyday.js); today's run when
-     one is planned (log the km and time here); push-ups with +5 / +10 / +20.
+     (today's first, then in progress, overdue and next) to tick off, tap to pick for the next session, or ▶ to
+     start one on right away.
+   - Today's goal: the day's hours against the target, the running session's minutes shown as they build, and its
+     study to-do list (studyday.js); today's run when one is planned (log the km and time here); push-ups with
+     +5 / +10 / +20.
    - Days left: a live countdown to Paper 1, the journey day and the R1 deadline.
-   P, Esc or Exit leaves; Space starts or pauses the timer; following a link leaves too. It stays open through a
+   While a session is on, the top bar carries a small timer on narrower screens and the browser tab shows the
+   time left. P, Esc or Exit leaves; Space starts or pauses the timer; F full screen; B a 5-minute break;
+   following a link leaves too. It stays open through a
    reload (pref 'hyper') and keeps the screen awake where the browser allows it. Menus, dialogs, toasts, the
    voice caption and the deep focus screens sit above it; the app underneath is inert while it is open. */
 import { html, raw, esc, fmt1, fmtN, fmtD, fmtDS, fmtMins, fmtClock, plural, mmss, diff, nowMin, now, clamp01, sortBy } from './util.js';
 import { icon } from './icons.js';
-import { confirm } from './components.js';
+import { confirm, toast } from './components.js';
 import { pref, setPref } from './prefs.js';
 import * as store from './store.js';
 import * as timer from './timer.js';
@@ -23,6 +27,7 @@ import { blockState, studyPlan, noHrs, shortGoal, midSentence } from './studyday
 
 const C = 2 * Math.PI * 120;
 let el = null, unsub = null, clockT = 0, soonT = 0, lock = null, pending = false, prevFocus = null, blockKey = '';
+let curName = '', baseTitle = '', shownTitle = '', askedTitle = '', popped = null, fsMine = false, titleObs = null;
 
 export const isOpen = () => !!el;
 
@@ -43,6 +48,9 @@ const label = (M, f) => {
   return { name: (w.code ? w.code + ' ' : '') + (w.short || f.subject), sub: ch ? '#' + ch.id + ' ' + ch.name : 'Any chapter', c: w.c || 'var(--ink)' };
 };
 const live = () => timer.running() || timer.state().remaining != null;
+const endsAt = (s) => { const e = new Date(s.endsAt); return fmtClock(e.getHours() * 60 + e.getMinutes()); };
+// minutes of the focus session on now (they reach today's hours when it ends)
+const sessionMins = () => { const s = timer.state(); return live() && timer.MODES[s.mode].focus ? Math.max(0, Math.floor((s.dur - timer.remaining()) / 60)) : 0; };
 
 // ---------- 1. timer ----------
 function timerPanel(M, P) {
@@ -62,7 +70,7 @@ function timerPanel(M, P) {
     <div class="hy-tbody">
       <div class="hy-what"><b><i class="dot" style="--c:${L.c}"></i>${L.name}</b><span>${L.sub}</span></div>
       <div class="hy-ring${run ? ' on' : ''}"><svg viewBox="0 0 280 280" aria-hidden="true"><circle cx="140" cy="140" r="120" fill="none" stroke="var(--hero-track)" stroke-width="8"/><circle ${raw(on ? 'data-timer-ring data-c="' + C.toFixed(2) + '"' : '')} cx="140" cy="140" r="120" fill="none" stroke="var(--on-hero)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C.toFixed(2)}" stroke-dashoffset="${on ? off : 0}" transform="rotate(-90 140 140)"/></svg>
-        <div class="hy-time"><span ${raw(on ? 'data-timer-text' : '')} role="timer" aria-live="off">${mmss(r)}</span><small>${on ? (run ? 'of ' + Math.round(s.dur / 60) + ' min' : 'paused') : 'minutes'}</small></div></div>
+        <div class="hy-time"><span ${raw(on ? 'data-timer-text' : '')} role="timer" aria-live="off">${mmss(r)}</span><small>${on ? (run ? 'ends ' + endsAt(s) : 'paused') : 'minutes'}</small></div></div>
       ${ctl}
       ${next ? html`<p class="hy-next"><span>Next</span> ${next.name}${next.sub !== 'Any chapter' && next.sub !== 'Any paper' ? ' · ' + next.sub : ''}</p>` : ''}
       <p class="hy-sess">${today.length ? 'Today · ' + plural(today.length, 'session') + ' · ' + fmtMins(fm) + ' focused' : 'No focus sessions yet today'}<span class="kbd-hint" aria-hidden="true"> · <kbd class="kbd">Space</kbd> ${!on ? 'starts' : run ? 'pauses' : 'resumes'}</span></p>
@@ -79,19 +87,24 @@ function chapterList(M, subject) {
 }
 function subjectsPanel(M, P) {
   const wk = weekBySubject(M.t), list = chapterList(M, P.subject), w0 = M.worlds.find((w) => w.key === P.subject) || M.worlds[0];
+  const on = live(), mins = minutes(M);
   const paper = (w) => {
-    const on = P.subject === w.key, mins = wk[w.key] || 0;
-    return html`<button type="button" class="hy-paper" id="${'hy-p-' + w.paper}" data-hy="paper" data-k="${w.key}" aria-pressed="${String(on)}" aria-label="${w.code + ' ' + w.short + ': ' + w.done + ' of ' + w.chapters + ' chapters done, ' + (mins ? fmtMins(mins) : 'no') + ' focus this week'}">
-      <span class="hy-paper-h"><i class="dot" style="--c:${w.c}"></i><b>${w.code}</b>${w.short}</span>
+    const sel = P.subject === w.key, fm = wk[w.key] || 0;
+    const say = w.code + ' ' + w.short + ': ' + w.done + ' of ' + w.chapters + ' R1 chapters done' + (w.overdue ? ', ' + w.overdue + ' overdue' : '') + ', ' + (fm ? fmtMins(fm) : 'no') + ' focus this week';
+    return html`<button type="button" class="hy-paper${w.overdue ? ' late' : ''}" id="${'hy-p-' + w.paper}" data-hy="paper" data-k="${w.key}" aria-pressed="${String(sel)}" aria-label="${say}" title="${say}">
+      <span class="hy-paper-h"><i class="dot" style="--c:${w.c}"></i><b>${w.code}</b>${w.short}</span>${w.overdue ? html`<span class="hy-late" aria-hidden="true">${w.overdue}</span>` : ''}
       <span class="hy-bar" aria-hidden="true"><i style="width:${(clamp01(w.pct) * 100).toFixed(1)}%"></i></span>
-      <small aria-hidden="true">${w.done}/${w.chapters}${w.overdue ? ' · ' + w.overdue + ' late' : ''} · ${mins ? fmtMins(mins) : '0m'} wk</small></button>`;
+      <span class="hy-paper-f" aria-hidden="true"><span>${w.done}/${w.chapters}</span><span>${icon('clock')}${fm ? fmtMins(fm) : '0m'}</span></span></button>`;
   };
+  // tap a chapter's name to make it the next session; ▶ starts a session on it straight away
   const row = (c) => {
-    const done = c.status === 'done', aim = P.kind === 'subject' && String(P.chapterId) === String(c.id);
+    const done = c.status === 'done', picked = !done && P.kind === 'subject' && String(P.chapterId) === String(c.id);
     const when = c.planned === M.t ? 'Today' : c.flag === 'overdue' ? 'Overdue · ' + fmtDS(c.planned) : fmtDS(c.planned);
-    return html`<li class="check${done ? ' done' : ''}${aim ? ' aim' : ''}"><button type="button" class="cbx" role="checkbox" id="${'hy-cbx-' + c.id}" aria-checked="${String(done)}" data-act="chapter-toggle" data-id="${c.id}" aria-label="${(done ? 'Mark not done: ' : 'Mark done: ') + c.name}">${icon('check')}</button>
-      <span class="li-main"><b>${c.name}</b><small>${when}${c.status === 'progress' ? ' · in progress' : ''}${c.hrs ? ' · ' + fmt1(c.hrs) + ' h' : ''}</small></span>
-      ${done ? '' : html`<button type="button" class="icon-btn sm hy-aim" id="${'hy-aim-' + c.id}" data-hy="aim" data-id="${c.id}" aria-pressed="${String(aim)}" aria-label="${(aim ? 'Stop aiming the next session at ' : 'Aim the next session at ') + c.name}" title="${aim ? 'The next session is on this chapter' : 'Focus the next session on this'}">${icon('target')}</button>`}</li>`;
+    const meta = html`<b>${c.name}</b><small>${when}${c.status === 'progress' ? ' · in progress' : ''}${c.hrs ? ' · ' + fmt1(c.hrs) + ' h' : ''}</small>`;
+    return html`<li class="check${done ? ' done' : ''}${picked ? ' aim' : ''}"><button type="button" class="cbx" role="checkbox" id="${'hy-cbx-' + c.id}" aria-checked="${String(done)}" data-act="chapter-toggle" data-id="${c.id}" aria-label="${(done ? 'Mark not done: ' : 'Mark done: ') + c.name}">${icon('check')}</button>
+      ${done ? html`<span class="li-main">${meta}</span>` : html`<button type="button" class="li-main hy-pick" id="${'hy-pick-' + c.id}" data-hy="pick" data-id="${c.id}" aria-pressed="${String(picked)}" title="${picked ? 'Up next' : 'Make this the next session'}">${meta}</button>`}
+      ${picked ? html`<span class="chip ink hy-nx">Next</span>` : ''}
+      ${!done && !on ? html`<button type="button" class="icon-btn sm hy-play" id="${'hy-go-' + c.id}" data-hy="go-ch" data-id="${c.id}" aria-label="${'Start ' + mins + ' minutes on ' + c.name}" title="${'Start ' + mins + ' min on this'}">${icon('play')}</button>` : ''}</li>`;
   };
   return html`<section class="hy-panel hy-subj" aria-labelledby="hy-h-subj">
     <div class="hy-ph"><h2 id="hy-h-subj">${icon('book')}Subjects</h2><button type="button" class="tog hy-gen" id="hy-gen" data-hy="general" aria-pressed="${String(P.kind === 'general')}">General study</button></div>
@@ -117,11 +130,12 @@ function goalPanel(M, S) {
   const d = M.todayDay, r = d ? d.rec : store.dayRec(M.t), hrs = +r.hrs || 0, tgt = d ? d.target : 0;
   const names = [...new Set(S.groups.map((g) => shortGoal(g.title)))].map((x, i) => (i ? midSentence(x) : x));
   const say = names.length > 1 ? names.slice(0, -1).join(', ') + ', then ' + names[names.length - 1] : names[0] || (d ? 'Study ' + fmt1(tgt) + ' h' : 'Nothing planned today');
-  const hit = tgt && hrs >= tgt;
+  const hit = tgt && hrs >= tgt, sess = sessionMins(), w1 = clamp01(tgt ? hrs / tgt : 0), w2 = clamp01(tgt ? (hrs + sess / 60) / tgt : 0) - w1;
+  const togo = Math.max(0, tgt - hrs - sess / 60);
   return html`<section class="hy-panel hy-goal" aria-labelledby="hy-h-goal">
     <div class="hy-ph"><h2 id="hy-h-goal">${icon('target')}Today’s goal</h2><span class="lbl">${d ? d.label : 'Outside the plan'}${S.total ? ' · ' + S.done + ' / ' + S.total + ' done' : ''}</span></div>
-    <div class="hy-hrs"><b>${fmt1(hrs)}</b><span>/ ${fmt1(tgt)} h studied</span><span class="grow"></span>${hit ? html`<span class="chip good">${icon('check')}Target hit</span>` : tgt ? html`<span class="chip">${fmt1(tgt - hrs)} h to go</span>` : ''}</div>
-    <div class="meter ${hit ? 'good' : ''}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(clamp01(tgt ? hrs / tgt : 0) * 100)}" aria-label="${fmt1(hrs) + ' of ' + fmt1(tgt) + ' hours studied today'}"><i style="width:${(clamp01(tgt ? hrs / tgt : 0) * 100).toFixed(1)}%"></i></div>
+    <div class="hy-hrs"><b data-pop="hrs" data-v="${fmt1(hrs)}">${fmt1(hrs)}</b><span>/ ${fmt1(tgt)} h studied</span><span class="grow"></span>${sess ? html`<span class="chip ink" title="Added to today’s hours when the session ends">+${fmtMins(sess)} now</span>` : ''}${hit ? html`<span class="chip good">${icon('check')}Target hit</span>` : tgt ? html`<span class="chip">${togo ? fmt1(togo) + ' h to go' : 'Target in reach'}</span>` : ''}</div>
+    <div class="meter ${hit ? 'good' : ''}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(w1 * 100)}" aria-label="${fmt1(hrs) + ' of ' + fmt1(tgt) + ' hours studied today' + (sess ? ', plus ' + plural(sess, 'minute') + ' in this session' : '')}"><i style="width:${(w1 * 100).toFixed(1)}%"></i>${w2 > 0 ? html`<i class="hy-pend" style="left:${(w1 * 100).toFixed(1)}%;width:${(w2 * 100).toFixed(1)}%"></i>` : ''}</div>
     <p class="hy-say">${say}</p>
     <div class="hy-scroll" data-scroll="goal">${S.groups.length ? S.groups.map((g) => html`<div class="hy-grp"><p class="hy-gh">${g.tag ? html`<span class="lbl">${g.tag}</span>` : ''}<b>${g.title}</b></p><ul class="hy-list">${g.items.map((it) => itemRow(M, it, g.title))}</ul></div>`) : html`<p class="hy-empty">${icon('calcheck')}No study tasks planned for today.</p>`}</div>
   </section>`;
@@ -147,7 +161,7 @@ function pushPanel(M) {
   const d = M.todayDay, r = d ? d.rec : store.dayRec(M.t), n = +r.pushups || 0, T = d ? d.pushT : M.pushToday, hit = T && n >= T;
   return html`<section class="hy-panel hy-push" aria-labelledby="hy-h-push">
     <div class="hy-ph"><h2 id="hy-h-push">${icon('strength')}Push-ups</h2>${hit ? html`<span class="chip good">${icon('check')}Target hit</span>` : html`<span class="lbl">${fmtN(Math.max(0, T - n))} to go</span>`}</div>
-    <div class="hy-big"><b>${fmtN(n)}</b><span>/ ${fmtN(T)} today</span></div>
+    <div class="hy-big"><b data-pop="push" data-v="${n}">${fmtN(n)}</b><span>/ ${fmtN(T)} today</span></div>
     <div class="meter ${hit ? 'good' : ''}" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(clamp01(T ? n / T : 0) * 100)}" aria-label="${fmtN(n) + ' of ' + fmtN(T) + ' push-ups'}"><i style="width:${(clamp01(T ? n / T : 0) * 100).toFixed(1)}%"></i></div>
     <div class="hy-push-b" role="group" aria-label="Add push-ups">${[5, 10, 20].map((k) => html`<button type="button" class="btn sm" id="${'hy-push-' + k}" data-hy="push" data-v="${k}" aria-label="${'Add ' + k + ' push-ups'}">+${k}</button>`)}<button type="button" class="btn sm" id="hy-push-undo" data-hy="push" data-v="-5" aria-label="Take away 5 push-ups" ${raw(n ? '' : 'disabled')}>−5</button>${hit ? '' : html`<button type="button" class="btn sm primary" id="hy-push-all" data-hy="push" data-v="all">${icon('check')}All ${fmtN(T)}</button>`}</div>
   </section>`;
@@ -176,14 +190,17 @@ function nowLine(B) {
   return B.next ? html`Free until <b>${B.next.label}</b> at ${fmtClock(B.next.from)}` : 'Day done';
 }
 function screen() {
-  const M = model(), P = pick(M), B = blockState(M), S = studyPlan(M, B), R = todayRun(M), run = timer.running();
+  const M = model(), P = pick(M), B = blockState(M), S = studyPlan(M, B), R = todayRun(M), run = timer.running(), on = live(), s = timer.state(), fs = !!document.fullscreenElement;
   blockKey = (B.cur ? B.cur.label : '') + '|' + (B.next ? B.next.label : '');
-  return html`<header class="hy-top">
-      <span class="hy-tag"><i class="hy-pulse${run ? ' on' : ''}" aria-hidden="true"></i>Hyper study</span>
+  curName = on ? (s.deep ? label(M, s.focus).name : timer.MODES[s.mode].label) : '';
+  return html`<header class="hy-top${on ? ' live' : ''}">
+      <span class="hy-tag"><i class="hy-pulse${run ? ' on' : ''}" aria-hidden="true"></i>Hyper<span class="hy-tw"> study</span></span>
       <span class="hy-now"><span class="hy-date">${fmtD(M.t)} · </span><span data-hy-clock>${fmtClock(nowMin())}</span>${M.todayDay ? html`<span class="hy-blk"> · ${nowLine(B)}</span>` : ''}</span>
       <span class="grow"></span>
+      ${on ? html`<button type="button" class="hy-mini" id="hy-mini" data-hy="toggle" aria-label="${(run ? 'Pause' : 'Resume') + ' the timer, ' + curName}" title="${run ? 'Pause' : 'Resume'}"><span data-timer-text>${mmss(timer.remaining())}</span>${icon(run ? 'pause' : 'play')}</button>` : ''}
+      ${fsOK() ? html`<button type="button" class="btn sm ghost" id="hy-fs" data-hy="fs" aria-pressed="${String(fs)}" aria-label="Full screen" aria-keyshortcuts="F" title="${fs ? 'Leave full screen · F' : 'Full screen, nothing else on the screen · F'}">${icon(fs ? 'minimize' : 'maximize')}<span class="hy-bl">Full screen</span><kbd class="kbd kbd-hint" aria-hidden="true">F</kbd></button>` : ''}
       ${'speechSynthesis' in window ? html`<button type="button" class="btn sm ghost hy-brief" id="hy-brief" data-act="brief" aria-label="Brief me" aria-keyshortcuts="V" title="Read today out loud · V">${icon('volume')}<span class="hy-bl">Brief me</span><kbd class="kbd kbd-hint" aria-hidden="true">V</kbd></button>` : ''}
-      <button type="button" class="btn sm" id="hy-exit" data-hy="exit" aria-keyshortcuts="P Escape" title="Leave Hyper study · P or Esc">${icon('x')}Exit<kbd class="kbd kbd-hint" aria-hidden="true">P</kbd></button>
+      <button type="button" class="btn sm" id="hy-exit" data-hy="exit" aria-label="Exit Hyper study" aria-keyshortcuts="P Escape" title="Leave Hyper study · P or Esc">${icon('x')}<span class="hy-bl">Exit</span><kbd class="kbd kbd-hint" aria-hidden="true">P</kbd></button>
     </header>
     <div class="hy-grid${R ? '' : ' no-run'}">${timerPanel(M, P)}${subjectsPanel(M, P)}${goalPanel(M, S)}${R ? runPanel(M, R) : ''}${pushPanel(M)}${countdownPanel(M)}</div>`;
 }
@@ -199,11 +216,26 @@ function render() {
   el.scrollTop = top;
   el.querySelectorAll('[data-scroll]').forEach((n) => { if (sc[n.dataset.scroll]) n.scrollTop = sc[n.dataset.scroll]; });
   // focus stays on the same control; when it's gone (Start became Pause), on the one that took its place
-  if (fid) { const n = document.getElementById(fid) || (SWAP[fid] && (document.getElementById(SWAP[fid]) || document.getElementById('hy-go'))); (n || el).focus({ preventScroll: true }); }
-  else if (mine) el.focus({ preventScroll: true });
+  if (fid) {
+    const alt = SWAP[fid] || (/^hy-go-/.test(fid) ? 'hy-toggle' : '');
+    const n = document.getElementById(fid) || (alt && (document.getElementById(alt) || document.getElementById('hy-go')));
+    (n || el).focus({ preventScroll: true });
+  } else if (mine) el.focus({ preventScroll: true });
+  // a number that just changed (push-ups, hours) gives a small bounce
+  const was = popped; popped = {};
+  el.querySelectorAll('[data-pop]').forEach((n) => { const k = n.dataset.pop; popped[k] = n.dataset.v; if (was && was[k] != null && was[k] !== n.dataset.v) n.classList.add('pop'); });
+  title();
 }
-const SWAP = { 'hy-go': 'hy-toggle', 'hy-break': 'hy-toggle', 'hy-toggle': 'hy-go', 'hy-end': 'hy-go', 'hy-skip': 'hy-go', 'hy-lost': 'hy-toggle', 'hy-push-all': 'hy-push-5', 'hy-push-undo': 'hy-push-5', 'hy-gen': 'hy-gen' };
+const SWAP = { 'hy-go': 'hy-toggle', 'hy-break': 'hy-toggle', 'hy-toggle': 'hy-go', 'hy-end': 'hy-go', 'hy-skip': 'hy-go', 'hy-lost': 'hy-toggle', 'hy-push-all': 'hy-push-5', 'hy-push-undo': 'hy-push-5', 'hy-gen': 'hy-gen', 'hy-mini': 'hy-go' };
 const soon = () => { if (!soonT) soonT = setTimeout(render, 40); };
+// Today's goal alone, each minute of a session (a full redraw would restart the ring's breathing)
+function patchGoal() {
+  const g = el && el.querySelector('.hy-goal'); if (!g) return;
+  const a = document.activeElement; if (a && g.contains(a)) { soon(); return; }
+  const sc = g.querySelector('[data-scroll]'), top = sc ? sc.scrollTop : 0, M = model();
+  g.outerHTML = String(goalPanel(M, studyPlan(M, blockState(M))));
+  const n = el.querySelector('.hy-goal [data-scroll]'); if (n) n.scrollTop = top;
+}
 function clock() {
   if (!el) return;
   const c = el.querySelector('[data-hy-clock]'), t = fmtClock(nowMin());
@@ -211,8 +243,33 @@ function clock() {
     c.textContent = t;
     const B = blockState(model());
     if ((B.cur ? B.cur.label : '') + '|' + (B.next ? B.next.label : '') !== blockKey) soon();   // a block started or ended
+    else if (timer.running() && sessionMins()) patchGoal();
   }
+  title();
 }
+// the browser tab shows the time left while a session is on: "23:41 · P1 Accounts"
+function title() {
+  if (el && live()) {
+    // the browser trims and collapses spaces in a title, so build it the same way or it never matches (and loops)
+    const s = timer.state(), name = curName || (s.deep ? 'Focus' : timer.MODES[s.mode].label);
+    const t = (mmss(timer.remaining()) + (timer.running() ? '' : ' paused') + ' · ' + name).replace(/\s+/g, ' ').trim();
+    if (document.title !== shownTitle) baseTitle = document.title;   // the page changed it
+    if (t !== askedTitle || document.title !== shownTitle) { askedTitle = t; document.title = t; }
+    shownTitle = document.title;   // as the browser keeps it: the next call (and the title watcher) then leaves it alone
+  } else if (shownTitle) { if (document.title === shownTitle) document.title = baseTitle; shownTitle = ''; askedTitle = ''; }
+}
+// real full screen (the browser's own bars go too); the whole page, so dialogs and toasts still show
+const fsOK = () => !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
+function fullscreen() {
+  if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); return; }
+  // some hosts (embedded views) neither grant nor refuse: say so after a moment rather than nothing at all
+  let settled = false;
+  const no = () => { if (settled) return; settled = true; toast('This browser won’t go full screen here', { tone: 'warn' }); };
+  fsMine = true;
+  document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { settled = true; }, no);
+  setTimeout(() => { if (!document.fullscreenElement) no(); }, 2000);
+}
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement) fsMine = false; if (el) soon(); });
 async function wake(on) {
   try {
     if (on && navigator.wakeLock && !lock && !document.hidden) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); }
@@ -225,7 +282,9 @@ export function open() {
   if (el) { render(); return; }
   prevFocus = document.activeElement;
   el = document.createElement('div');
-  el.className = 'hyper'; el.id = 'hyper'; el.tabIndex = -1;
+  el.className = 'hyper intro'; el.id = 'hyper'; el.tabIndex = -1;
+  popped = null;
+  setTimeout(() => { if (el) el.classList.remove('intro'); }, 900);   // the cards rise in once, on opening
   el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Hyper study mode');
   el.addEventListener('click', onClick);
   el.addEventListener('focusout', () => { if (pending) setTimeout(() => { if (pending) render(); }, 0); });
@@ -235,13 +294,21 @@ export function open() {
   setPref('hyper', 1);
   unsub = store.subscribe(soon);
   clockT = setInterval(clock, 1000);
+  // the page sets its own title on every redraw; put the time left straight back
+  const tt = document.querySelector('title');
+  if (tt && window.MutationObserver) { titleObs = new MutationObserver(title); titleObs.observe(tt, { childList: true, characterData: true, subtree: true }); }
   wake(true);
   render();
   setTimeout(() => { const b = el && (el.querySelector('#hy-toggle') || el.querySelector('#hy-go')); if (b) b.focus({ preventScroll: true }); }, 30);
 }
 export function close() {
   if (!el) return;
+  const going = live();
+  if (titleObs) { titleObs.disconnect(); titleObs = null; }
   el.remove(); el = null;
+  title();
+  if (fsMine && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  if (going) toast('Hyper study closed · the timer keeps running. P brings it back', { icon: 'timer', ms: 3500 });
   clearTimeout(soonT); soonT = 0; pending = false;
   document.body.classList.remove('hyper-on');
   setInert(false);
@@ -253,6 +320,13 @@ export function close() {
   prevFocus = null;
 }
 export const toggle = () => (el ? close() : open());
+// keys while it's open (main.js): F full screen, B a 5-minute break
+export function onKey(k) {
+  if (!el) return false;
+  if (k === 'f' && fsOK()) { fullscreen(); return true; }
+  if (k === 'b' && !live()) { timer.reset('short'); timer.start(); return true; }
+  return false;
+}
 // Space: start the picked session, or pause / resume the one that's on
 export function toggleTimer() {
   if (!el) return;
@@ -284,7 +358,9 @@ async function onClick(e) {
   }
   if (a === 'paper') { const k = b.dataset.k, P = pick(M); setPick(M, { kind: 'subject', subject: k, chapterId: P.subject === k ? P.chapterId : '' }); return; }
   if (a === 'general') { const P = pick(M); setPick(M, { kind: P.kind === 'general' ? 'subject' : 'general' }); return; }
-  if (a === 'aim') { const P = pick(M), id = b.dataset.id, on = P.kind === 'subject' && String(P.chapterId) === id; setPick(M, { kind: 'subject', chapterId: on ? '' : +id || id }); return; }
+  if (a === 'pick') { const P = pick(M), id = b.dataset.id, on = P.kind === 'subject' && String(P.chapterId) === id; setPick(M, { kind: 'subject', chapterId: on ? '' : +id || id }); return; }
+  if (a === 'go-ch') { const id = b.dataset.id; setPref('hyperPick', Object.assign({}, pick(M), { kind: 'subject', chapterId: +id || id, date: M.t })); start(M); return; }
+  if (a === 'fs') { fullscreen(); return; }
   if (a === 'push') {
     const d = M.todayDay, r = d ? d.rec : store.dayRec(M.t), n = +r.pushups || 0, T = d ? d.pushT : M.pushToday;
     const v = b.dataset.v === 'all' ? Math.max(n, T) : Math.max(0, n + +b.dataset.v);

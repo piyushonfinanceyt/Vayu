@@ -199,7 +199,7 @@ export function shortcutsHelp() {
   const row = (k, t) => '<li class="between" style="padding:8px 0;border-top:1px solid var(--line)"><span>' + esc(t) + '</span><span class="row" style="gap:4px">' + k.map((x) => '<span class="kbd">' + esc(x) + '</span>').join('') + '</span></li>';
   modal({ title: 'Keyboard shortcuts', body: raw('<ul>' + [
     [['Ctrl', 'K'], 'Search and commands'], [['/'], 'Search'], [['L'], 'Quick log for today'], [['T'], 'Switch light / dark theme'],
-    [['P'], 'Hyper study mode (again or Esc to leave)'], [['Space'], 'Start or pause the timer in Hyper study'], [['V'], 'Brief me about today (again to stop)'],
+    [['P'], 'Hyper study mode (again or Esc to leave)'], [['Space'], 'Start or pause the timer in Hyper study'], [['F'], 'Full screen in Hyper study'], [['B'], '5-minute break in Hyper study'],[['V'], 'Brief me about today (again to stop)'],
     [['G', 'D'], 'Go to Dashboard'], [['G', 'P'], 'Go to Study Plan'], [['G', 'L'], 'Go to Daily Log'], [['G', 'M'], 'Go to Mock Tests'], [['G', 'S'], 'Go to Subjects'],
     [['['], 'Previous day (Plan, Log)'], [[']'], 'Next day (Plan, Log)'], [['←', '→'], 'Step through chart points'], [['Esc'], 'Close'], [['?'], 'This list']
   ].map((x) => row(x[0], x[1])).join('') + '</ul>') });

@@ -809,7 +809,7 @@ body.focus-on { overflow: hidden; }
 
 /* ================= Hyper study mode (hyper.js) ================= */
 /* page tokens, so it follows light and dark; the timer is the one contrasting (hero) card */
-body.hyper-on { overflow: hidden; }
+body.hyper-on, html:has(> body.hyper-on) { overflow: hidden; }
 .hyper { position: fixed; inset: 0; z-index: 50; display: flex; flex-direction: column; background: var(--bg); color: var(--ink); overflow-y: auto; overscroll-behavior: contain; animation: fade-in .25s both; }
 .hyper:focus { outline: none; }
 .hy-top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px 14px; padding: calc(12px + env(safe-area-inset-top)) 20px 12px; background: var(--bg); }
@@ -869,14 +869,22 @@ body.hyper-on { overflow: hidden; }
 .hy-paper[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
 .hy-paper-h { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13.5px; white-space: nowrap; overflow: hidden; }
 .hy-paper-h b { font-weight: 600; }
-.hy-paper small { color: var(--ink-3); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hy-paper { position: relative; }
+.hy-late { position: absolute; top: -7px; right: -5px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad-bg); color: var(--bad); box-shadow: 0 0 0 2px var(--surface); font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; font-variant-numeric: tabular-nums; }
+.hy-paper-f { display: flex; justify-content: space-between; gap: 6px; color: var(--ink-3); font-size: 11.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hy-paper-f span { display: inline-flex; align-items: center; gap: 3px; }
+.hy-paper-f svg { width: 12px; height: 12px; }
 .hy-bar { display: block; height: 4px; border-radius: 4px; background: var(--track); overflow: hidden; }
 .hy-bar i { display: block; height: 100%; border-radius: 4px; background: var(--ink); }
 .hy-sub-h { display: flex; justify-content: space-between; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
-.hy-aim { color: var(--ink-3); }
-.hy-aim[aria-pressed="true"] { background: var(--hero); color: var(--on-hero); }
-.hy-aim svg { width: 17px; height: 17px; }
+/* a chapter: tap the name to make it next, ▶ to start on it now */
+.hy-pick { text-align: left; border-radius: 6px; padding: 2px 0; }
+.hy-pick:hover b { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--line-2); }
 .hy-list .check.aim .li-main b { font-weight: 600; }
+.hy-nx { flex: none; }
+.hy-play { color: var(--ink); background: var(--soft-2); transition: background .2s, color .2s; }
+.hy-play:hover { background: var(--hero); color: var(--on-hero); }
+.hy-play svg { width: 15px; height: 15px; }
 
 /* 3. today */
 .hy-hrs { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -901,6 +909,9 @@ body.hyper-on { overflow: hidden; }
 .hy-push-b { display: flex; gap: 6px; flex-wrap: wrap; }
 .hy-push-b .btn { flex: 1 1 0; min-width: 52px; padding-left: 8px; padding-right: 8px; font-variant-numeric: tabular-nums; }
 .hy-push-b .btn.primary { flex: 2 1 auto; }
+/* the running session's minutes, ahead of the hours they'll join */
+.meter > i.hy-pend { background: var(--ink); opacity: .28; border-radius: 0 8px 8px 0; }
+.hy-hrs > b, .hy-big > b { display: inline-block; transform-origin: 0 100%; }
 
 /* 4. days left */
 .hy-cd-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 28px; }
@@ -945,4 +956,27 @@ body.hyper-on { overflow: hidden; }
   .hy-ring { width: min(100%, clamp(150px, calc(100vh - 540px), 300px)); }
   .hy-tbody { gap: 12px; }
 }
-@media (prefers-reduced-motion: reduce) { .hyper, .hy-ring.on svg, .hy-pulse.on { animation: none; } }
+/* the top bar while a session runs: a small timer where the ring may be off screen */
+.hy-mini { display: none; flex: none; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: var(--r-pill); background: var(--hero); color: var(--on-hero); font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.hy-mini svg { width: 13px; height: 13px; }
+@media (max-width: 1079px) { .hy-top.live .hy-mini { display: inline-flex; } }
+@media (max-width: 560px) {
+  .hy-top { gap: 8px; }
+  .hy-top.live .hy-now { display: none; }
+}
+@media (max-width: 420px) { .hy-top.live .hy-tw { display: none; } }
+/* motion: the cards rise in on opening, the ring sweeps smoothly, a changed number gives a small bounce */
+.hyper.intro .hy-top { animation: fade-in .3s both; }
+.hyper.intro .hy-panel { animation: fade-up .5s var(--ease) both; }
+.hyper.intro .hy-panel:nth-child(2) { animation-delay: .04s; }
+.hyper.intro .hy-panel:nth-child(3) { animation-delay: .08s; }
+.hyper.intro .hy-panel:nth-child(4) { animation-delay: .12s; }
+.hyper.intro .hy-panel:nth-child(5) { animation-delay: .16s; }
+.hyper.intro .hy-panel:nth-child(6) { animation-delay: .2s; }
+.hy-ring [data-timer-ring] { transition: stroke-dashoffset 1s linear; }
+@keyframes hy-pop { 0% { transform: scale(1); } 35% { transform: scale(1.16); } 100% { transform: scale(1); } }
+.pop { animation: hy-pop .5s var(--ease); }
+@media (prefers-reduced-motion: reduce) {
+  .hyper, .hy-ring.on svg, .hy-pulse.on, .hyper.intro .hy-top, .hyper.intro .hy-panel, .pop { animation: none; }
+  .hy-ring [data-timer-ring] { transition: none; }
+}

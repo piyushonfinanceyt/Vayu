@@ -183,10 +183,11 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && menuOpen()) { closeMenu(); return; }
   if (inField || e.ctrlKey || e.metaKey || e.altKey || modalOpen() || paletteOpen() || document.body.classList.contains('modal-open')) return;
   const k = e.key.toLowerCase();
-  // in Hyper study: Esc leaves, Space starts or pauses the timer (unless a button or link has the focus)
+  // in Hyper study: Esc leaves, Space starts or pauses the timer (unless a button or link has the focus), F, B
   if (hyper.isOpen() && !focus.shown() && !gPending) {
     if (e.key === 'Escape') { e.preventDefault(); hyper.close(); return; }
     if (e.key === ' ' && !tgt.closest('button, a, summary, [role="checkbox"]')) { e.preventDefault(); hyper.toggleTimer(); return; }
+    if ((k === 'f' || k === 'b') && hyper.onKey(k)) { e.preventDefault(); return; }   // F full screen, B a 5-minute break
   }
   if (gPending) {
     clearTimeout(gPending); gPending = 0;
